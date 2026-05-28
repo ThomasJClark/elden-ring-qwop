@@ -7,6 +7,10 @@ license = "MIT"
 [lib]
 crate-type = ["cdylib"]
 
+[[bin]]
+name = "test"
+path = "src/test.rs"
+
 [profile.release]
 panic = "abort"
 strip = true
@@ -19,6 +23,7 @@ codegen-units = 1
 eldenring = { path = "../eldenring-rs/crates/eldenring" }
 fromsoftware-shared = { path = "../eldenring-rs/crates/shared" }
 glam = "0.32.1"
+macroquad = "0.4.15"
 pelite = "0.10.0"
 phf = { version = "0.13.1", features = ["macros"] }
 retour = { version = "0.3.1", features = ["static-detour"] }

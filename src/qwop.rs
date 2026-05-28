@@ -6,41 +6,41 @@ use wrapped2d::b2::{
 
 type World = wrapped2d::b2::World<wrapped2d::user_data::NoUserData>;
 
-const WORLD_WIDTH: f32 = 32.0;
-const WORLD_HEIGHT: f32 = 20.0;
-const CATEGORY_GROUND: u16 = 0x0001;
-const CATEGORY_PLAYER: u16 = 0x0002;
-const MASK_NO_SELF: u16 = 0xfffd;
-const MASK_ALL: u16 = 0xffff;
-const GROUND_HALF_WIDTH: f32 = 10.0 * WORLD_WIDTH;
-const GROUND_HALF_HEIGHT: f32 = 0.5;
+pub const WORLD_WIDTH: f32 = 32.0;
+pub const WORLD_HEIGHT: f32 = 20.0;
+pub const CATEGORY_GROUND: u16 = 0x0001;
+pub const CATEGORY_PLAYER: u16 = 0x0002;
+pub const MASK_NO_SELF: u16 = 0xfffd;
+pub const MASK_ALL: u16 = 0xffff;
+pub const GROUND_HALF_WIDTH: f32 = 10.0 * WORLD_WIDTH;
+pub const GROUND_HALF_HEIGHT: f32 = 0.5;
 
 pub struct QwopPhysicsState {
-    world: World,
-    ground: BodyHandle,
-    torso: BodyHandle,
-    head: BodyHandle,
-    left_arm: BodyHandle,
-    left_forearm: BodyHandle,
-    left_thigh: BodyHandle,
-    left_calf: BodyHandle,
-    left_foot: BodyHandle,
-    right_arm: BodyHandle,
-    right_forearm: BodyHandle,
-    right_thigh: BodyHandle,
-    right_calf: BodyHandle,
-    right_foot: BodyHandle,
-    neck: JointHandle,
-    left_shoulder: JointHandle,
-    left_hip: JointHandle,
-    left_elbow: JointHandle,
-    left_knee: JointHandle,
-    left_ankle: JointHandle,
-    right_shoulder: JointHandle,
-    right_hip: JointHandle,
-    right_elbow: JointHandle,
-    right_knee: JointHandle,
-    right_ankle: JointHandle,
+    pub world: World,
+    pub ground: BodyHandle,
+    pub torso: BodyHandle,
+    pub head: BodyHandle,
+    pub left_arm: BodyHandle,
+    pub left_forearm: BodyHandle,
+    pub left_thigh: BodyHandle,
+    pub left_calf: BodyHandle,
+    pub left_foot: BodyHandle,
+    pub right_arm: BodyHandle,
+    pub right_forearm: BodyHandle,
+    pub right_thigh: BodyHandle,
+    pub right_calf: BodyHandle,
+    pub right_foot: BodyHandle,
+    pub neck: JointHandle,
+    pub left_shoulder: JointHandle,
+    pub left_hip: JointHandle,
+    pub left_elbow: JointHandle,
+    pub left_knee: JointHandle,
+    pub left_ankle: JointHandle,
+    pub right_shoulder: JointHandle,
+    pub right_hip: JointHandle,
+    pub right_elbow: JointHandle,
+    pub right_knee: JointHandle,
+    pub right_ankle: JointHandle,
 }
 
 /// Headless reimplementation of the QWOP physics engine
