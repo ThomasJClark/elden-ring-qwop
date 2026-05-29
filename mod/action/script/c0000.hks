@@ -998,8 +998,13 @@ function GetSwordArtsRequestNew()
         request = SWORDARTS_REQUEST_RIGHT_COMBO_2
         animID = SWORDARTS_ANIM_ID_RIGHT_COMBO_2
     elseif IsRollingArts(arts_id) == TRUE then
-        request = SWORDARTS_REQUEST_RIGHT_STEP
-        animID = SWORDARTS_ANIM_ID_RIGHT_STEP_FRONT
+        if c_EnableQWOP == TRUE then
+            request = SWORDART_REQUEST_INVALIDP
+            animID = SWORDARTS_ANIM_ID_RIGHT_NORMAL
+        else
+            request = SWORDARTS_REQUEST_RIGHT_STEP
+            animID = SWORDARTS_ANIM_ID_RIGHT_STEP_FRONT
+        end
     elseif (style == HAND_LEFT_BOTH or style == HAND_RIGHT_BOTH) and IsShieldArts(arts_id) == TRUE then
         request = SWORDARTS_REQUEST_BOTH_NORMAL
         animID = SWORDARTS_ANIM_ID_BOTH_NORMAL
@@ -3803,20 +3808,22 @@ function ExecItem(quick_type, blend_type)
     elseif item_type == ITEM_VOICE then -- Duplicate Condition #1
         ExecEventHalfBlend(Event_ItemVoice, blend_type)
     elseif item_type == ITEM_SUMMONHORSE then
-        SetVariable("RideOnSummonTest", 0)
-        SetVariable("IndexItemUseAnim", item_type)
-        SetVariable("ItemDashSpeedIndex", 0)
+        if c_EnableQWOP == FALSE then
+            SetVariable("RideOnSummonTest", 0)
+            SetVariable("IndexItemUseAnim", item_type)
+            SetVariable("ItemDashSpeedIndex", 0)
 
-        if GetVariable("MoveSpeedIndex") >= 1 then
-            SetVariable("ItemDashSpeedIndex", 1)
-        end
-        if GetVariable("MoveSpeedLevel") >= 0.8999999761581421 then
-            IsSummonDash = TRUE
-        else
-            IsSummonDash = FALSE
-        end
+            if GetVariable("MoveSpeedIndex") >= 1 then
+                SetVariable("ItemDashSpeedIndex", 1)
+            end
+            if GetVariable("MoveSpeedLevel") >= 0.8999999761581421 then
+                IsSummonDash = TRUE
+            else
+                IsSummonDash = FALSE
+            end
 
-        ExecEventHalfBlend(Event_ItemDash, blend_type)
+            ExecEventHalfBlend(Event_ItemDash, blend_type)
+        end
     elseif item_type == ITEM_VOICE then -- Duplicate Condition #2
         ExecEventHalfBlend(Event_ItemReturnBuddy, blend_type)
     elseif item_type == ITEM_SUMMONBUDDY then
@@ -4100,6 +4107,10 @@ function GetHandChangeType(hand)
 end
 
 function ExecJump()
+    if c_EnableQWOP == TRUE then
+        return FALSE
+    end
+
     -- Note: Restored original value during full remake. Repo values was ACTION_ARM_JUMP instead of ACTION_ARM_CHANGE_STYLE
     -- note: Original decompile of 1.10 has ACTION_ARM_CHANGE_STYLE instead of jump
     if env(ActionRequest, ACTION_ARM_CHANGE_STYLE) == FALSE and env(IsAIJumpRequested) == FALSE then
@@ -4469,6 +4480,10 @@ function ExecEvasion(backstep_limit, estep, is_usechainrecover)
 
     local request = GetEvasionRequest()
 
+    if c_EnableQWOP == TRUE then
+        return FALSE
+    end
+
     if env(ActionRequest, ACTION_ARM_L3) == TRUE and c_IsStealth == FALSE then
         StealthTransitionIndexUpdate()
         ExecEvent("W_Stealth_to_Stealth_Idle")
@@ -4478,6 +4493,7 @@ function ExecEvasion(backstep_limit, estep, is_usechainrecover)
         ExecEvent("W_Stealth_to_Idle")
         return TRUE
     end
+
     if request == ATTACK_REQUEST_INVALID then
         return FALSE
     end
@@ -18251,6 +18267,10 @@ function GetConstVariable()
     c_SwordArtsID, c_SwordArtsHand = GetSwordArtInfo()
     c_IsEnableSwordArts = IsEnableSwordArts()
     c_IsStealth = env(GetSpEffectID, 8001)
+
+    if env(IsCOMPlayer) == FALSE then
+        c_EnableQWOP = TRUE
+    end
 end
 
 function GetHalfBlendInfo()
@@ -26034,6 +26054,7 @@ IS_ATTACKED_JUMPMAGIC = FALSE
 g_IsMimicry = 0
 g_EnableMimicry = 0
 g_ComboReset = FALSE
+c_EnableQWOP = FALSE
 lastUsedMagicAnim = -1
 
 Jump_InitWeaponRef = FALSE

@@ -164,6 +164,7 @@ pub extern "C" fn DllMain(module: HINSTANCE, reason: u32) -> bool {
                                     && main_player.as_ptr() as *const _
                                         == chr_ctrl.as_ref().owner.as_ptr()
                                 {
+                                    main_player.debug_flags.set_disabled_movement(true);
                                     main_player.modules.behavior.root_motion.z +=
                                         -qwop.lock().unwrap().velocity()
                                             * main_player.modules.hitstop.frame_time;
