@@ -17,30 +17,30 @@ pub const GROUND_HALF_HEIGHT: f32 = 0.5;
 
 pub struct QwopPhysicsState {
     pub world: World,
-    pub ground: BodyHandle,
+    pub _ground: BodyHandle,
     pub torso: BodyHandle,
-    pub head: BodyHandle,
-    pub left_arm: BodyHandle,
-    pub left_forearm: BodyHandle,
+    pub _head: BodyHandle,
+    pub _left_arm: BodyHandle,
+    pub _left_forearm: BodyHandle,
     pub left_thigh: BodyHandle,
     pub left_calf: BodyHandle,
     pub left_foot: BodyHandle,
-    pub right_arm: BodyHandle,
-    pub right_forearm: BodyHandle,
+    pub _right_arm: BodyHandle,
+    pub _right_forearm: BodyHandle,
     pub right_thigh: BodyHandle,
     pub right_calf: BodyHandle,
     pub right_foot: BodyHandle,
-    pub neck: JointHandle,
+    pub _neck: JointHandle,
     pub left_shoulder: JointHandle,
     pub left_hip: JointHandle,
     pub left_elbow: JointHandle,
     pub left_knee: JointHandle,
-    pub left_ankle: JointHandle,
+    pub _left_ankle: JointHandle,
     pub right_shoulder: JointHandle,
     pub right_hip: JointHandle,
     pub right_elbow: JointHandle,
     pub right_knee: JointHandle,
-    pub right_ankle: JointHandle,
+    pub _right_ankle: JointHandle,
 }
 
 /// Headless reimplementation of the QWOP physics engine
@@ -167,16 +167,6 @@ fn create_player_joint(
         max_motor_torque,
     }: JointOptions,
 ) -> JointHandle {
-    let local_anchor_a = world.body(body_a).local_point(&Vec2 {
-        x: anchor_a_x,
-        y: anchor_a_y,
-    });
-
-    let local_anchor_b = world.body(body_b).local_point(&Vec2 {
-        x: anchor_b_x,
-        y: anchor_b_y,
-    });
-
     world.create_joint(&RevoluteJointDef {
         local_anchor_a: Vec2 {
             x: anchor_a_x,
@@ -201,7 +191,7 @@ impl QwopPhysicsState {
     fn new() -> Self {
         let mut world = World::new(&Vec2 { x: 0.0, y: 10.0 });
 
-        let ground = create_ground_body(&mut world);
+        let _ground = create_ground_body(&mut world);
 
         let torso = create_player_body(BodyOptions {
             world: &mut world,
@@ -213,7 +203,7 @@ impl QwopPhysicsState {
             friction: 0.2,
             density: 1.0,
         });
-        let head = create_player_body(BodyOptions {
+        let _head = create_player_body(BodyOptions {
             world: &mut world,
             x: 3.888130278719558,
             y: -5.621802929095265,
@@ -223,7 +213,7 @@ impl QwopPhysicsState {
             friction: 0.2,
             density: 1.0,
         });
-        let left_arm = create_player_body(BodyOptions {
+        let _left_arm = create_player_body(BodyOptions {
             world: &mut world,
             x: 4.417861014480877,
             y: -2.806563606410589,
@@ -233,7 +223,7 @@ impl QwopPhysicsState {
             friction: 0.2,
             density: 1.0,
         });
-        let left_forearm = create_player_body(BodyOptions {
+        let _left_forearm = create_player_body(BodyOptions {
             world: &mut world,
             x: 5.830008603424893,
             y: -2.8733539631159584,
@@ -273,7 +263,7 @@ impl QwopPhysicsState {
             friction: 1.5,
             density: 3.0,
         });
-        let right_arm = create_player_body(BodyOptions {
+        let _right_arm = create_player_body(BodyOptions {
             world: &mut world,
             x: 1.1812303663272852,
             y: -3.5000256518601014,
@@ -283,7 +273,7 @@ impl QwopPhysicsState {
             friction: 0.2,
             density: 1.0,
         });
-        let right_forearm = create_player_body(BodyOptions {
+        let _right_forearm = create_player_body(BodyOptions {
             world: &mut world,
             x: 0.4078206420797428,
             y: -1.0599953233084172,
@@ -323,9 +313,9 @@ impl QwopPhysicsState {
             friction: 1.5,
             density: 3.0,
         });
-        let neck = create_player_joint(JointOptions {
+        let _neck = create_player_joint(JointOptions {
             world: &mut world,
-            body_a: head,
+            body_a: _head,
             body_b: torso,
             anchor_a_x: -0.22839485113389058,
             anchor_a_y: 1.1126087775923434,
@@ -339,7 +329,7 @@ impl QwopPhysicsState {
         });
         let left_shoulder = create_player_joint(JointOptions {
             world: &mut world,
-            body_a: left_arm,
+            body_a: _left_arm,
             body_b: torso,
             anchor_a_x: -1.06207890966549,
             anchor_a_y: 0.17409394631566927,
@@ -367,8 +357,8 @@ impl QwopPhysicsState {
         });
         let left_elbow = create_player_joint(JointOptions {
             world: &mut world,
-            body_a: left_forearm,
-            body_b: left_arm,
+            body_a: _left_forearm,
+            body_b: _left_arm,
             anchor_a_x: -1.2620587423023992,
             anchor_a_y: 0.1572266865964126,
             anchor_b_x: 1.6027887369842988,
@@ -393,7 +383,7 @@ impl QwopPhysicsState {
             enable_motor: true,
             max_motor_torque: 3000.0,
         });
-        let left_ankle = create_player_joint(JointOptions {
+        let _left_ankle = create_player_joint(JointOptions {
             world: &mut world,
             body_a: left_foot,
             body_b: left_calf,
@@ -409,7 +399,7 @@ impl QwopPhysicsState {
         });
         let right_shoulder = create_player_joint(JointOptions {
             world: &mut world,
-            body_a: right_arm,
+            body_a: _right_arm,
             body_b: torso,
             anchor_a_x: 1.2001841231501342,
             anchor_a_y: 0.014095940491621661,
@@ -437,8 +427,8 @@ impl QwopPhysicsState {
         });
         let right_elbow = create_player_joint(JointOptions {
             world: &mut world,
-            body_a: right_forearm,
-            body_b: right_arm,
+            body_a: _right_forearm,
+            body_b: _right_arm,
             anchor_a_x: 1.786878910753607,
             anchor_a_y: -0.08751611739562593,
             anchor_b_x: -1.3780071636887352,
@@ -463,7 +453,7 @@ impl QwopPhysicsState {
             enable_motor: true,
             max_motor_torque: 3000.0,
         });
-        let right_ankle = create_player_joint(JointOptions {
+        let _right_ankle = create_player_joint(JointOptions {
             world: &mut world,
             body_a: right_foot,
             body_b: right_calf,
@@ -480,30 +470,30 @@ impl QwopPhysicsState {
 
         Self {
             world,
-            ground,
+            _ground,
             torso,
-            head,
-            left_arm,
-            left_forearm,
+            _head,
+            _left_arm,
+            _left_forearm,
             left_thigh,
             left_calf,
             left_foot,
-            right_arm,
-            right_forearm,
+            _right_arm,
+            _right_forearm,
             right_thigh,
             right_calf,
             right_foot,
-            neck,
+            _neck,
             left_shoulder,
             left_hip,
             left_elbow,
             left_knee,
-            left_ankle,
+            _left_ankle,
             right_shoulder,
             right_hip,
             right_elbow,
             right_knee,
-            right_ankle,
+            _right_ankle,
         }
     }
 }

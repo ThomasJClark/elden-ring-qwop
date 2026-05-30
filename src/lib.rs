@@ -55,7 +55,6 @@ static_detour! {
 /// Update method called each physics step. This overrides the player's poses set by the normal
 /// Havok animation system
 fn update_skeleton(player: &mut PlayerIns, skeleton: SkeletonState) {
-    println!("{:?}", skeleton);
     if unsafe { player.player_game_data.as_ref() }.current_hp == 0 {
         player.chr_ctrl.chr_ragdoll_state = 2;
         return;
