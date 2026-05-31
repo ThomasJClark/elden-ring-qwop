@@ -112,10 +112,11 @@ pub extern "C" fn DllMain(module: HINSTANCE, reason: u32) -> bool {
             let qwop = Arc::new(Mutex::new(qwop::Qwop::new()));
 
             unsafe {
+                // WorldChrMan
                 ChrIns_PreBehaviorSafe
                     .initialize(
                         {
-                            let va = Program::current().rva_to_va(0x50fee0).unwrap();
+                            let va = Program::current().rva_to_va(0x50fe10).unwrap();
                             std::mem::transmute::<u64, extern "C" fn(NonNull<WorldChrMan>)>(va)
                         },
                         {
@@ -152,7 +153,7 @@ pub extern "C" fn DllMain(module: HINSTANCE, reason: u32) -> bool {
                 ChrCtrl_UpdatePos
                     .initialize(
                         {
-                            let va = Program::current().rva_to_va(0x3c8720).unwrap();
+                            let va = Program::current().rva_to_va(0x3c8610).unwrap();
                             std::mem::transmute::<u64, extern "C" fn(NonNull<ChrCtrl>)>(va)
                         },
                         {

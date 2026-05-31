@@ -78,24 +78,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cstl-sys"
-version = "2.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93cb3efebcf02ee15186d55068b8394bf5df33331feabda4f2cdcf3573d7c659"
-dependencies = [
- "cc",
-]
-
-[[package]]
-name = "cxx-stl"
-version = "4.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e42cf6d86f92c165eaf2d4afa54382ec9b8d1cdef39f4265bc938cd055198f83"
-dependencies = [
- "cstl-sys",
-]
-
-[[package]]
 name = "dataview"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -112,13 +94,14 @@ checksum = "c2ea6706d74fca54e15f1d40b5cf7fe7f764aaec61352a9fcec58fe27e042fc8"
 
 [[package]]
 name = "eldenring"
-version = "0.13.0"
+version = "0.14.0"
+source = "git+https://github.com/ThomasJClark/fromsoftware-rs.git?rev=14d4b41#14d4b41b9af641ac770817f370a0415824883fd0"
 dependencies = [
  "bitfield",
  "bitflags 2.11.1",
- "cxx-stl",
  "encoding_rs",
  "fromsoftware-shared",
+ "fromsoftware-shared-stl",
  "glam",
  "num_enum",
  "pelite",
@@ -183,7 +166,8 @@ dependencies = [
 
 [[package]]
 name = "fromsoftware-shared"
-version = "0.13.0"
+version = "0.14.0"
+source = "git+https://github.com/ThomasJClark/fromsoftware-rs.git?rev=14d4b41#14d4b41b9af641ac770817f370a0415824883fd0"
 dependencies = [
  "bitflags 2.11.1",
  "from-singleton",
@@ -198,13 +182,19 @@ dependencies = [
 
 [[package]]
 name = "fromsoftware-shared-macros"
-version = "0.13.0"
+version = "0.14.0"
+source = "git+https://github.com/ThomasJClark/fromsoftware-rs.git?rev=14d4b41#14d4b41b9af641ac770817f370a0415824883fd0"
 dependencies = [
  "inflections",
  "proc-macro2",
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "fromsoftware-shared-stl"
+version = "0.14.0"
+source = "git+https://github.com/ThomasJClark/fromsoftware-rs.git?rev=14d4b41#14d4b41b9af641ac770817f370a0415824883fd0"
 
 [[package]]
 name = "fxhash"
