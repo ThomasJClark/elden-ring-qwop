@@ -998,13 +998,8 @@ function GetSwordArtsRequestNew()
         request = SWORDARTS_REQUEST_RIGHT_COMBO_2
         animID = SWORDARTS_ANIM_ID_RIGHT_COMBO_2
     elseif IsRollingArts(arts_id) == TRUE then
-        if c_EnableQWOP == TRUE then
-            request = SWORDART_REQUEST_INVALIDP
-            animID = SWORDARTS_ANIM_ID_RIGHT_NORMAL
-        else
-            request = SWORDARTS_REQUEST_RIGHT_STEP
-            animID = SWORDARTS_ANIM_ID_RIGHT_STEP_FRONT
-        end
+        request = SWORDARTS_REQUEST_RIGHT_STEP
+        animID = SWORDARTS_ANIM_ID_RIGHT_STEP_FRONT
     elseif (style == HAND_LEFT_BOTH or style == HAND_RIGHT_BOTH) and IsShieldArts(arts_id) == TRUE then
         request = SWORDARTS_REQUEST_BOTH_NORMAL
         animID = SWORDARTS_ANIM_ID_BOTH_NORMAL
