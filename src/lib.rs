@@ -133,6 +133,7 @@ fn chr_ins_pre_behavior_safe_detour(player: &mut PlayerIns) {
                     reference_poses[bone_index].translation.y + qwop.physics.elevation();
                 pose.rotation * HkQuaternion::from_rotation_x(qwop.physics.root_angle())
             }
+            "Neck" => HkQuaternion::from_rotation_y(qwop.physics.neck_angle()),
             "L_Thigh" => HkQuaternion::from_euler(
                 glam::EulerRot::XZY,
                 0.0,

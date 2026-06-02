@@ -492,6 +492,12 @@ impl QwopPhysics {
         -torso.angle() - PI / 2.0
     }
 
+    pub fn neck_angle(&self) -> f32 {
+        let head = self.world.body(self.head);
+        let torso = self.world.body(self.torso);
+        -(head.angle() - torso.angle() - PI / 2.0)
+    }
+
     pub fn left_hip_angle(&self) -> f32 {
         let torso = self.world.body(self.torso);
         let left_thigh = self.world.body(self.left_thigh);
