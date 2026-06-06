@@ -1,3 +1,4 @@
+mod initialize_default_controls;
 mod qwop_control;
 mod qwop_physics;
 
@@ -20,16 +21,16 @@ use windows::Win32::{
         LibraryLoader::DisableThreadLibraryCalls,
         SystemServices::DLL_PROCESS_ATTACH,
     },
-    UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_F6, VK_F7},
+    UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_F6},
 };
 
 use eldenring::{
-    cs::{ChrCtrl, PlayerIns, UserInputKey, WorldChrMan},
-    fd4::FD4PadManager,
+    cs::{CSTaskGroupIndex, CSTaskImp, ChrCtrl, PlayerIns, UserInputKey, WorldChrMan},
+    fd4::{FD4PadManager, FD4TaskData},
     havok::HkQuaternion,
     util::system::wait_for_system_init,
 };
-use fromsoftware_shared::{FromStatic, Program};
+use fromsoftware_shared::{FromStatic, Program, SharedTaskImpExt};
 use pelite::pe64::Pe;
 use retour::static_detour;
 
@@ -61,6 +62,16 @@ static_detour! {
     static ChrCtrl_UpdatePos: extern "C" fn(NonNull<ChrCtrl>);
 }
 
+/// Update various stuff in the main thread
+fn main_update() {
+    // For testing, press F6 to toggle QWOP controls
+    if unsafe { GetAsyncKeyState(VK_F6.0.into()) } & 1 != 0 {
+        DISABLE_QWOP_CONTROL.fetch_xor(true, Ordering::Relaxed);
+    }
+
+    initialize_default_controls::update_inputs();
+}
+
 /// Advances the QWOP simulation based on the current inputs, and updates the character's pose.
 /// This is called in a hook just before the player's pose is read by the game, so we can override
 /// certain bones with our own pose
@@ -75,15 +86,7 @@ fn chr_ins_pre_behavior_safe_detour(player: &mut PlayerIns) {
         return;
     };
 
-    // Temporary for testing. F7 = reset, F6 = toggle normal controls
-    if unsafe { GetAsyncKeyState(VK_F7.0.into()) } & 1 != 0 {
-        player.chr_ctrl.chr_ragdoll_state = 0;
-        qwop.reset();
-    }
-    if unsafe { GetAsyncKeyState(VK_F6.0.into()) } & 1 != 0 {
-        DISABLE_QWOP_CONTROL.fetch_xor(true, Ordering::Relaxed);
-    }
-    if DISABLE_QWOP_CONTROL.load(Ordering::Relaxed) {
+    if pad.poll_digital_input(UserInputKey::MovementControl) {
         player.chr_ctrl.chr_ragdoll_state = 0;
         qwop.reset();
         return;
@@ -123,6 +126,7 @@ fn chr_ins_pre_behavior_safe_detour(player: &mut PlayerIns) {
     let bones = &hkb_character.setup.skeleton.bones.as_slice();
     let reference_poses = &hkb_character.setup.skeleton.reference_pose.as_slice();
     let poses = hkb_character.state.poses_mut(bones.len());
+
     // Update the bone poses to match the QWOP simulation
     for (bone_index, bone) in bones.iter().enumerate() {
         let pose = &mut poses[bone_index];
@@ -194,6 +198,14 @@ pub extern "C" fn DllMain(module: HINSTANCE, reason: u32) -> bool {
         wait_for_system_init(&Program::current(), Duration::MAX).unwrap();
 
         unsafe {
+            let cs_task = CSTaskImp::wait_for_instance(Duration::MAX).unwrap();
+            cs_task.run_recurring(
+                |_: &FD4TaskData| {
+                    main_update();
+                },
+                CSTaskGroupIndex::FrameBegin,
+            );
+
             ChrIns_PreBehaviorSafe
                 .initialize(
                     std::mem::transmute::<u64, extern "C" fn(NonNull<WorldChrMan>)>(
