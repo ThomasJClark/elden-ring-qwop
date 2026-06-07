@@ -1,17 +1,14 @@
-mod initialize_default_controls;
-mod qwop_control;
-mod qwop_physics;
+mod controls;
+mod physics;
+mod rvas;
+mod skeleton_sync;
 
 use glam::vec4;
 use std::{
-    f32::consts::PI,
     fs::OpenOptions,
     os::windows::io::AsRawHandle,
     ptr::NonNull,
-    sync::{
-        LazyLock, Mutex,
-        atomic::{AtomicBool, Ordering},
-    },
+    sync::{LazyLock, Mutex},
     time::Duration,
 };
 use windows::Win32::{
@@ -21,159 +18,77 @@ use windows::Win32::{
         LibraryLoader::DisableThreadLibraryCalls,
         SystemServices::DLL_PROCESS_ATTACH,
     },
-    UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_F6},
 };
 
 use eldenring::{
-    cs::{CSTaskGroupIndex, CSTaskImp, ChrCtrl, PlayerIns, UserInputKey, WorldChrMan},
-    fd4::{FD4PadManager, FD4TaskData},
-    havok::HkQuaternion,
+    cs::{CSTaskGroupIndex, CSTaskImp, ChrCtrl, PlayerIns, WorldChrMan},
+    fd4::FD4TaskData,
     util::system::wait_for_system_init,
 };
 use fromsoftware_shared::{FromStatic, Program, SharedTaskImpExt};
 use pelite::pe64::Pe;
 use retour::static_detour;
 
-/// Bones that are locked into the reference pose at all times
-static LOCK_ROTATION_BONES: phf::Set<&'static str> = phf::phf_set! {
-    "Pelvis",
-    "L_Hip" | "R_Hip",
-    "L_Calf_Skirt" | "R_Calf_Skirt",
-    "L_CalfTwist" | "R_CalfTwist",
-    "L_CalfTwist1" | "R_CalfTwist1",
-    "L_Foot_Dummy1" | "R_Foot_Dummy1",
-    "L_Foot_Dummy2" | "R_Foot_Dummy2",
-    "L_FootTwist" | "R_FootTwist",
-    "L_Toe0" | "R_Toe0",
-    "L_Knee" | "R_Knee",
-    "L_Knee_Skirt" | "R_Knee_Skirt",
-    "L_Thigh_Skirt" | "R_Thigh_Skirt",
-    "L_ThighTwist" | "R_ThighTwist",
-    "L_ThighTwist1" | "R_ThighTwist1",
-};
+use crate::controls::QwopControls;
+use crate::physics::QwopPhysics;
 
-static QWOP: LazyLock<Mutex<qwop_control::QwopControl>> =
-    LazyLock::new(|| Mutex::new(qwop_control::QwopControl::new()));
+static QWOP_CONTROLS: LazyLock<Mutex<QwopControls>> =
+    LazyLock::new(|| Mutex::new(QwopControls::new()));
 
-static DISABLE_QWOP_CONTROL: AtomicBool = AtomicBool::new(false);
+static QWOP_PHYSICS: LazyLock<Mutex<physics::QwopPhysics>> =
+    LazyLock::new(|| Mutex::new(QwopPhysics::new()));
 
 static_detour! {
     static ChrIns_PreBehaviorSafe: extern "C" fn(NonNull<WorldChrMan>);
     static ChrCtrl_UpdatePos: extern "C" fn(NonNull<ChrCtrl>);
 }
 
-/// Update various stuff in the main thread
 fn main_update() {
-    // For testing, press F6 to toggle QWOP controls
-    if unsafe { GetAsyncKeyState(VK_F6.0.into()) } & 1 != 0 {
-        DISABLE_QWOP_CONTROL.fetch_xor(true, Ordering::Relaxed);
-    }
-
-    initialize_default_controls::update_inputs();
+    QWOP_CONTROLS.lock().unwrap().poll();
 }
 
 /// Advances the QWOP simulation based on the current inputs, and updates the character's pose.
 /// This is called in a hook just before the player's pose is read by the game, so we can override
 /// certain bones with our own pose
 fn chr_ins_pre_behavior_safe_detour(player: &mut PlayerIns) {
-    let Ok(mut qwop) = QWOP.lock() else {
-        return;
-    };
-    let Ok(pad_manager) = (unsafe { FD4PadManager::instance() }) else {
-        return;
-    };
-    let Some(pad) = pad_manager.get_in_game_pad() else {
+    let Ok(mut qwop_physics) = QWOP_PHYSICS.lock() else {
         return;
     };
 
-    if pad.poll_digital_input(UserInputKey::MovementControl) {
-        player.chr_ctrl.chr_ragdoll_state = 0;
-        qwop.reset();
-        return;
-    }
+    if let Ok(qwop_controls) = QWOP_CONTROLS.lock() {
+        if qwop_controls.disabled {
+            return;
+        }
 
-    // The movement keys are remapped to QWOP controls, since afaik there isn't a good way
-    // to add completely new controls, and the player can't do normal WASD movement anyway
-    qwop.control(
-        pad.poll_digital_input(UserInputKey::MoveForwards), // Q
-        pad.poll_digital_input(UserInputKey::MoveBackwards), // W
-        pad.poll_digital_input(UserInputKey::MoveLeft),     // O
-        pad.poll_digital_input(UserInputKey::MoveRight),    // P
-    );
-
-    qwop.step(player.modules.hitstop.frame_time);
-
-    // When the player falls per QWOP rules, damage them and ragdoll. In real QWOP, this just
-    // immediately restarts the game.
-    if qwop.fallen {
-        player.chr_ctrl.chr_ragdoll_state = 2;
-        return;
-    } else {
-        player.chr_ctrl.chr_ragdoll_state = 0;
-    }
-
-    // Also when the player dies, ragdoll and stop updating the pose
-    if unsafe { player.player_game_data.as_ref() }.current_hp == 0 {
-        player.chr_ctrl.chr_ragdoll_state = 2;
-        return;
-    }
-
-    let Some(havok_context) = &mut player.modules.behavior.havok_context else {
-        return;
+        qwop_physics.control(
+            qwop_controls.q,
+            qwop_controls.w,
+            qwop_controls.o,
+            qwop_controls.p,
+        );
     };
 
-    let hkb_character = &mut *havok_context.character;
-    let bones = &hkb_character.setup.skeleton.bones.as_slice();
-    let reference_poses = &hkb_character.setup.skeleton.reference_pose.as_slice();
-    let poses = hkb_character.state.poses_mut(bones.len());
+    qwop_physics.step(player.modules.hitstop.frame_time);
 
-    // Update the bone poses to match the QWOP simulation
-    for (bone_index, bone) in bones.iter().enumerate() {
-        let pose = &mut poses[bone_index];
-        pose.rotation = match bone.name.to_str() {
-            s if LOCK_ROTATION_BONES.contains(s) => reference_poses[bone_index].rotation,
-            "RootPos" => {
-                pose.translation.y =
-                    reference_poses[bone_index].translation.y + qwop.physics.elevation();
-                pose.rotation * HkQuaternion::from_rotation_x(qwop.physics.root_angle())
-            }
-            "Neck" => HkQuaternion::from_rotation_y(qwop.physics.neck_angle()),
-            "L_Thigh" => HkQuaternion::from_euler(
-                glam::EulerRot::XZY,
-                0.0,
-                -PI,
-                qwop.physics.left_hip_angle(),
-            ),
-            "R_Thigh" => HkQuaternion::from_euler(
-                glam::EulerRot::XZY,
-                0.0,
-                -PI,
-                qwop.physics.right_hip_angle(),
-            ),
-            "L_Calf" => HkQuaternion::from_rotation_y(qwop.physics.left_knee_angle()),
-            "R_Calf" => HkQuaternion::from_rotation_y(qwop.physics.right_knee_angle()),
-            "L_Foot" => HkQuaternion::from_rotation_y(qwop.physics.left_foot_angle()),
-            "R_Foot" => HkQuaternion::from_rotation_y(qwop.physics.right_foot_angle()),
-            _ => pose.rotation,
-        };
-    }
+    skeleton_sync::apply_skeleton(player, &qwop_physics);
 }
 
 /// Update the player's root motion based on the velocity in the QWOP simulation. This is called
 /// in a separate hook right after the root motion vector is overritten each physics step
 fn chr_ctrl_update_pos_detour(player: &mut PlayerIns) {
-    if DISABLE_QWOP_CONTROL.load(Ordering::Relaxed) {
+    if QWOP_CONTROLS
+        .lock()
+        .is_ok_and(|qwop_controls| qwop_controls.disabled)
+    {
         player.debug_flags.set_disabled_movement(false);
         return;
     }
 
-    let Ok(qwop) = QWOP.lock() else {
-        return;
+    if let Ok(qwop) = QWOP_PHYSICS.lock() {
+        let motion = -qwop.velocity() * player.modules.hitstop.frame_time;
+        player.modules.behavior.root_motion = vec4(0.0, 0.0, motion, 0.0);
+        player.debug_flags.set_disabled_movement(true);
     };
-
-    let motion = -qwop.physics.velocity() * player.modules.hitstop.frame_time;
-    player.modules.behavior.root_motion = vec4(0.0, 0.0, motion, 0.0);
-    player.debug_flags.set_disabled_movement(true);
 }
 
 #[unsafe(no_mangle)]
@@ -209,7 +124,9 @@ pub extern "C" fn DllMain(module: HINSTANCE, reason: u32) -> bool {
             ChrIns_PreBehaviorSafe
                 .initialize(
                     std::mem::transmute::<u64, extern "C" fn(NonNull<WorldChrMan>)>(
-                        Program::current().rva_to_va(0x50fe10).unwrap(),
+                        Program::current()
+                            .rva_to_va(rvas::CHR_INS_PRE_BEHAVIOR_SAFE)
+                            .unwrap(),
                     ),
                     move |mut world_chr_man: NonNull<WorldChrMan>| {
                         if let Some(main_player) = &mut world_chr_man.as_mut().main_player {
@@ -226,7 +143,9 @@ pub extern "C" fn DllMain(module: HINSTANCE, reason: u32) -> bool {
             ChrCtrl_UpdatePos
                 .initialize(
                     std::mem::transmute::<u64, extern "C" fn(NonNull<ChrCtrl>)>(
-                        Program::current().rva_to_va(0x3c8610).unwrap(),
+                        Program::current()
+                            .rva_to_va(rvas::CHR_CTRL_UPDATE_POS)
+                            .unwrap(),
                     ),
                     |chr_ctrl: NonNull<ChrCtrl>| {
                         if let Ok(world_chr_man) = WorldChrMan::instance_mut()
