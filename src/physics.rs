@@ -19,6 +19,10 @@ const QWOP_TO_WORLD_SCALE: f32 = 9.0;
 const INITIAL_POSITION_OFFSET: Vec2 = Vec2 { x: 0.0, y: 9.0 };
 const RESET_TIME: f32 = 1.0;
 
+/// QWOP runs at 30 FPS, but the Box2D physics world is updated by 40 ms per frame. Speed up time by
+/// this ratio to preserve speed of real QWOP
+const QWOP_TIME_DILATION: f32 = 30.0 * 0.04;
+
 /// A headless implementation of QWOP
 pub struct QwopPhysics {
     world: World,
@@ -553,9 +557,9 @@ impl QwopPhysics {
 
     // Advance the physics simulation by the given frame time
     pub fn step(&mut self, frame_time: f32) {
-        // QWOP uses 5 substeps at 25 fps. 2 substeps at 60 fps is approximately the same update
-        // rate
-        self.world.step(frame_time, 2, 2);
+        // Use 2 substeps instead of the 5 that real QWOP uses, since this typically runs at 60 FPS
+        // instead of 30
+        self.world.step(frame_time * QWOP_TIME_DILATION, 2, 2);
 
         // Reset after ragdolling for 1 second. `self.just_fallen` in dicates that we just fell this
         // frame, so a single instance of damage can be applied
