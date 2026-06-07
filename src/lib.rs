@@ -8,7 +8,10 @@ use std::{
     fs::OpenOptions,
     os::windows::io::AsRawHandle,
     ptr::NonNull,
-    sync::{LazyLock, Mutex},
+    sync::{
+        LazyLock, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
     time::Duration,
 };
 use windows::Win32::{
@@ -38,12 +41,20 @@ static QWOP_CONTROLS: LazyLock<Mutex<QwopControls>> =
 static QWOP_PHYSICS: LazyLock<Mutex<physics::QwopPhysics>> =
     LazyLock::new(|| Mutex::new(QwopPhysics::new()));
 
+static PREV_WORLD_LOADED: AtomicBool = AtomicBool::new(false);
+
 static_detour! {
     static ChrIns_PreBehaviorSafe: extern "C" fn(NonNull<WorldChrMan>);
     static ChrCtrl_UpdatePos: extern "C" fn(NonNull<ChrCtrl>);
 }
 
 fn main_update() {
+    let world_loaded = unsafe { WorldChrMan::instance() }
+        .is_ok_and(|world_chr_man| world_chr_man.main_player.is_some());
+    if !PREV_WORLD_LOADED.swap(world_loaded, Ordering::Relaxed) && world_loaded {
+        QWOP_PHYSICS.lock().unwrap().reset();
+    }
+
     QWOP_CONTROLS.lock().unwrap().poll();
 }
 
