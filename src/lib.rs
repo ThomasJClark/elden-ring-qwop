@@ -1,4 +1,5 @@
-mod controls;
+mod input_state;
+mod keybindings;
 mod physics;
 mod rvas;
 mod skeleton_sync;
@@ -32,16 +33,18 @@ use fromsoftware_shared::{FromStatic, Program, SharedTaskImpExt};
 use pelite::pe64::Pe;
 use retour::static_detour;
 
-use crate::controls::QwopControls;
+use crate::input_state::QwopInputState;
 use crate::physics::QwopPhysics;
 
-static QWOP_CONTROLS: LazyLock<Mutex<QwopControls>> =
-    LazyLock::new(|| Mutex::new(QwopControls::new()));
+static QWOP_INPUT_STATE: LazyLock<Mutex<QwopInputState>> =
+    LazyLock::new(|| Mutex::new(QwopInputState::new()));
 
 static QWOP_PHYSICS: LazyLock<Mutex<physics::QwopPhysics>> =
     LazyLock::new(|| Mutex::new(QwopPhysics::new()));
 
 static PREV_WORLD_LOADED: AtomicBool = AtomicBool::new(false);
+
+static JUST_FALLEN: AtomicBool = AtomicBool::new(false);
 
 static_detour! {
     static ChrIns_PreBehaviorSafe: extern "C" fn(NonNull<WorldChrMan>);
@@ -49,37 +52,51 @@ static_detour! {
 }
 
 fn main_update() {
-    let world_loaded = unsafe { WorldChrMan::instance() }
-        .is_ok_and(|world_chr_man| world_chr_man.main_player.is_some());
-    if !PREV_WORLD_LOADED.swap(world_loaded, Ordering::Relaxed) && world_loaded {
-        QWOP_PHYSICS.lock().unwrap().reset();
+    if let Some(_main_player) = unsafe { WorldChrMan::instance_mut() }
+        .ok()
+        .and_then(|world_chr_man| world_chr_man.main_player.as_mut())
+    {
+        // Reset the physics simulation when the world is reloaded
+        if !PREV_WORLD_LOADED.swap(true, Ordering::Relaxed) {
+            QWOP_PHYSICS.lock().unwrap().reset();
+        }
+
+        // Apply damage and reset the fallen flag when the player falls
+        if JUST_FALLEN.swap(false, Ordering::Relaxed) {
+            // main_player.apply_speffect(123456, true); todo
+        }
+    } else {
+        PREV_WORLD_LOADED.store(false, Ordering::Relaxed);
     }
 
-    QWOP_CONTROLS.lock().unwrap().poll();
+    QWOP_INPUT_STATE.lock().unwrap().poll();
 }
 
 /// Advances the QWOP simulation based on the current inputs, and updates the character's pose.
 /// This is called in a hook just before the player's pose is read by the game, so we can override
 /// certain bones with our own pose
 fn chr_ins_pre_behavior_safe_detour(player: &mut PlayerIns) {
-    let Ok(mut qwop_physics) = QWOP_PHYSICS.lock() else {
+    let mut qwop_physics = QWOP_PHYSICS.lock().unwrap();
+
+    let qwop_controls = QWOP_INPUT_STATE.lock().unwrap();
+    if qwop_controls.disabled {
         return;
-    };
+    }
 
-    if let Ok(qwop_controls) = QWOP_CONTROLS.lock() {
-        if qwop_controls.disabled {
-            return;
-        }
+    qwop_physics.control(
+        qwop_controls.q,
+        qwop_controls.w,
+        qwop_controls.o,
+        qwop_controls.p,
+    );
 
-        qwop_physics.control(
-            qwop_controls.q,
-            qwop_controls.w,
-            qwop_controls.o,
-            qwop_controls.p,
-        );
-    };
+    drop(qwop_controls);
 
     qwop_physics.step(player.modules.hitstop.frame_time);
+
+    if qwop_physics.fallen() {
+        JUST_FALLEN.store(true, Ordering::Relaxed);
+    }
 
     skeleton_sync::apply_skeleton(player, &qwop_physics);
 }
@@ -87,19 +104,14 @@ fn chr_ins_pre_behavior_safe_detour(player: &mut PlayerIns) {
 /// Update the player's root motion based on the velocity in the QWOP simulation. This is called
 /// in a separate hook right after the root motion vector is overritten each physics step
 fn chr_ctrl_update_pos_detour(player: &mut PlayerIns) {
-    if QWOP_CONTROLS
-        .lock()
-        .is_ok_and(|qwop_controls| qwop_controls.disabled)
-    {
+    if QWOP_INPUT_STATE.lock().unwrap().disabled {
         player.debug_flags.set_disabled_movement(false);
         return;
     }
 
-    if let Ok(qwop) = QWOP_PHYSICS.lock() {
-        let motion = -qwop.velocity() * player.modules.hitstop.frame_time;
-        player.modules.behavior.root_motion = vec4(0.0, 0.0, motion, 0.0);
-        player.debug_flags.set_disabled_movement(true);
-    };
+    let motion = -QWOP_PHYSICS.lock().unwrap().velocity() * player.modules.hitstop.frame_time;
+    player.modules.behavior.root_motion = vec4(0.0, 0.0, motion, 0.0);
+    player.debug_flags.set_disabled_movement(true);
 }
 
 #[unsafe(no_mangle)]

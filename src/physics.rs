@@ -57,7 +57,6 @@ pub struct QwopPhysics {
     right_knee: JointHandle,
     #[allow(unused)]
     right_ankle: JointHandle,
-    pub just_fallen: bool,
     pub fallen: bool,
     pub reset_timer: f32,
 }
@@ -496,7 +495,6 @@ impl QwopPhysics {
             right_elbow,
             right_knee,
             right_ankle,
-            just_fallen: false,
             fallen: false,
             reset_timer: -1.0,
         }
@@ -561,16 +559,13 @@ impl QwopPhysics {
         // instead of 30
         self.world.step(frame_time * QWOP_TIME_DILATION, 2, 2);
 
-        // Reset after ragdolling for 1 second. `self.just_fallen` in dicates that we just fell this
-        // frame, so a single instance of damage can be applied
+        // Reset after ragdolling for 1 second
         if self.reset_timer < 0.0 {
             if self.fallen() {
                 self.fallen = true;
-                self.just_fallen = true;
                 self.reset_timer = 0.0;
             }
         } else {
-            self.just_fallen = false;
             self.reset_timer += frame_time;
             if self.reset_timer > RESET_TIME {
                 self.reset();
