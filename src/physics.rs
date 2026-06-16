@@ -17,7 +17,7 @@ const GROUND_HALF_WIDTH: f32 = 10.0 * WORLD_WIDTH;
 const GROUND_HALF_HEIGHT: f32 = 0.5;
 const QWOP_TO_WORLD_SCALE: f32 = 9.0;
 const INITIAL_POSITION_OFFSET: Vec2 = Vec2 { x: 0.0, y: 9.0 };
-const RESET_TIME: f32 = 1.0;
+const RESET_TIME: f32 = 1.5;
 
 /// QWOP runs at 30 FPS, but the Box2D physics world is updated by 40 ms per frame. Speed up time by
 /// this ratio to preserve speed of real QWOP
@@ -57,8 +57,7 @@ pub struct QwopPhysics {
     right_knee: JointHandle,
     #[allow(unused)]
     right_ankle: JointHandle,
-    pub fallen: bool,
-    pub reset_timer: f32,
+    fall_reset_time: Option<f32>,
 }
 
 unsafe impl Send for QwopPhysics {}
@@ -495,8 +494,7 @@ impl QwopPhysics {
             right_elbow,
             right_knee,
             right_ankle,
-            fallen: false,
-            reset_timer: -1.0,
+            fall_reset_time: None,
         }
     }
 
@@ -559,17 +557,27 @@ impl QwopPhysics {
         // instead of 30
         self.world.step(frame_time * QWOP_TIME_DILATION, 2, 2);
 
-        // Reset after ragdolling for 1 second
-        if self.reset_timer < 0.0 {
-            if self.fallen() {
-                self.fallen = true;
-                self.reset_timer = 0.0;
+        self.fall_reset_time = match self.fall_reset_time {
+            Some(fall_reset_time) => Some(fall_reset_time + frame_time),
+            None => {
+                // In real QWOP, falling is detected by the head, arms, or forearms touching the
+                // track. We use the head or torso instead because the arm poses aren't shown in
+                // game.
+                if self.world.contacts().any(|contact| {
+                    let (body_a, _) = contact.fixture_a();
+                    let (body_b, _) = contact.fixture_b();
+                    body_a == self.ground && (body_b == self.torso || body_b == self.head)
+                }) {
+                    Some(0.0)
+                } else {
+                    None
+                }
             }
-        } else {
-            self.reset_timer += frame_time;
-            if self.reset_timer > RESET_TIME {
-                self.reset();
-            }
+        };
+
+        // Reset after ragdolling for a short period of time
+        if self.fall_reset_time.is_some_and(|time| time > RESET_TIME) {
+            self.reset();
         }
     }
 
@@ -643,13 +651,11 @@ impl QwopPhysics {
         }
     }
 
-    /// In real QWOP, falling is detected by the head, arms, or forearms touching the track.
-    /// We use the head or torso instead because the arm poses aren't shown in game.
     pub fn fallen(&self) -> bool {
-        self.world.contacts().any(|contact| {
-            let (body_a, _) = contact.fixture_a();
-            let (body_b, _) = contact.fixture_b();
-            body_a == self.ground && (body_b == self.torso || body_b == self.head)
-        })
+        self.fall_reset_time.is_some()
+    }
+
+    pub fn just_fallen(&self) -> bool {
+        self.fall_reset_time == Some(0.0)
     }
 }

@@ -25,7 +25,7 @@ use windows::Win32::{
 };
 
 use eldenring::{
-    cs::{CSTaskGroupIndex, CSTaskImp, ChrCtrl, PlayerIns, WorldChrMan},
+    cs::{CSTaskGroupIndex, CSTaskImp, ChrCtrl, ChrInsExt, PlayerIns, WorldChrMan},
     fd4::FD4TaskData,
     util::system::wait_for_system_init,
 };
@@ -35,6 +35,9 @@ use retour::static_detour;
 
 use crate::input_state::QwopInputState;
 use crate::physics::QwopPhysics;
+use crate::skeleton_sync::PlayerInsSkeletonSync;
+
+const FALL_DAMAGE_SPEFFECT: i32 = 67;
 
 static QWOP_INPUT_STATE: LazyLock<Mutex<QwopInputState>> =
     LazyLock::new(|| Mutex::new(QwopInputState::new()));
@@ -43,8 +46,7 @@ static QWOP_PHYSICS: LazyLock<Mutex<physics::QwopPhysics>> =
     LazyLock::new(|| Mutex::new(QwopPhysics::new()));
 
 static PREV_WORLD_LOADED: AtomicBool = AtomicBool::new(false);
-
-static JUST_FALLEN: AtomicBool = AtomicBool::new(false);
+static FALLEN: AtomicBool = AtomicBool::new(false);
 
 static_detour! {
     static ChrIns_PreBehaviorSafe: extern "C" fn(NonNull<WorldChrMan>);
@@ -52,7 +54,7 @@ static_detour! {
 }
 
 fn main_update() {
-    if let Some(_main_player) = unsafe { WorldChrMan::instance_mut() }
+    if let Some(main_player) = unsafe { WorldChrMan::instance_mut() }
         .ok()
         .and_then(|world_chr_man| world_chr_man.main_player.as_mut())
     {
@@ -62,8 +64,8 @@ fn main_update() {
         }
 
         // Apply damage and reset the fallen flag when the player falls
-        if JUST_FALLEN.swap(false, Ordering::Relaxed) {
-            // main_player.apply_speffect(123456, true); todo
+        if FALLEN.swap(false, Ordering::Relaxed) {
+            main_player.apply_speffect(FALL_DAMAGE_SPEFFECT, true);
         }
     } else {
         PREV_WORLD_LOADED.store(false, Ordering::Relaxed);
@@ -76,29 +78,27 @@ fn main_update() {
 /// This is called in a hook just before the player's pose is read by the game, so we can override
 /// certain bones with our own pose
 fn chr_ins_pre_behavior_safe_detour(player: &mut PlayerIns) {
-    let mut qwop_physics = QWOP_PHYSICS.lock().unwrap();
+    player.set_ragdoll(false);
 
     let qwop_controls = QWOP_INPUT_STATE.lock().unwrap();
     if qwop_controls.disabled {
         return;
     }
-
-    qwop_physics.control(
-        qwop_controls.q,
-        qwop_controls.w,
-        qwop_controls.o,
-        qwop_controls.p,
-    );
-
+    let q = qwop_controls.q;
+    let w = qwop_controls.w;
+    let o = qwop_controls.o;
+    let p = qwop_controls.p;
     drop(qwop_controls);
 
+    let mut qwop_physics = QWOP_PHYSICS.lock().unwrap();
+    qwop_physics.control(q, w, o, p);
     qwop_physics.step(player.modules.hitstop.frame_time);
 
-    if qwop_physics.fallen() {
-        JUST_FALLEN.store(true, Ordering::Relaxed);
+    if qwop_physics.just_fallen() {
+        FALLEN.store(true, Ordering::Relaxed);
     }
 
-    skeleton_sync::apply_skeleton(player, &qwop_physics);
+    player.apply_skeleton(&qwop_physics);
 }
 
 /// Update the player's root motion based on the velocity in the QWOP simulation. This is called
@@ -125,11 +125,9 @@ pub extern "C" fn DllMain(module: HINSTANCE, reason: u32) -> bool {
     unsafe {
         AllocConsole().unwrap();
         let stdout = OpenOptions::new().write(true).open("CONOUT$").unwrap();
-        let stderr = OpenOptions::new().write(true).open("CONOUT$").unwrap();
         SetStdHandle(STD_OUTPUT_HANDLE, HANDLE(stdout.as_raw_handle() as _)).unwrap();
-        SetStdHandle(STD_ERROR_HANDLE, HANDLE(stderr.as_raw_handle() as _)).unwrap();
+        SetStdHandle(STD_ERROR_HANDLE, HANDLE(stdout.as_raw_handle() as _)).unwrap();
         std::mem::forget(stdout);
-        std::mem::forget(stderr);
     };
 
     std::thread::spawn(move || {
