@@ -25,7 +25,10 @@ use windows::Win32::{
 };
 
 use eldenring::{
-    cs::{CSTaskGroupIndex, CSTaskImp, ChrCtrl, ChrInsExt, PlayerIns, WorldChrMan},
+    cs::{
+        CSTaskGroupIndex, CSTaskImp, ChrCtrl, ChrInsExt, EquipParamGoods, PlayerIns,
+        SoloParamRepository, WorldChrMan,
+    },
     fd4::FD4TaskData,
     util::system::wait_for_system_init,
 };
@@ -38,6 +41,7 @@ use crate::physics::QwopPhysics;
 use crate::skeleton_sync::PlayerInsSkeletonSync;
 
 const FALL_DAMAGE_SPEFFECT: i32 = 67;
+const SPECTRAL_STEED_WHISTLE_GOODS: u32 = 130;
 
 static QWOP_INPUT_STATE: LazyLock<Mutex<QwopInputState>> =
     LazyLock::new(|| Mutex::new(QwopInputState::new()));
@@ -71,7 +75,17 @@ fn main_update() {
         PREV_WORLD_LOADED.store(false, Ordering::Relaxed);
     }
 
-    QWOP_INPUT_STATE.lock().unwrap().poll();
+    let mut qwop_controls = QWOP_INPUT_STATE.lock().unwrap();
+    qwop_controls.poll();
+
+    // No honse when QWOP is enabled
+    if PREV_WORLD_LOADED.load(Ordering::Relaxed)
+        && let Ok(solo_param_repo) = unsafe { SoloParamRepository::instance_mut() }
+        && let Some(horse_whistle) =
+            solo_param_repo.get_mut::<EquipParamGoods>(SPECTRAL_STEED_WHISTLE_GOODS)
+    {
+        horse_whistle.set_enable_live(qwop_controls.disabled);
+    }
 }
 
 /// Advances the QWOP simulation based on the current inputs, and updates the character's pose.

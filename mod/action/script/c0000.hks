@@ -3803,22 +3803,20 @@ function ExecItem(quick_type, blend_type)
     elseif item_type == ITEM_VOICE then -- Duplicate Condition #1
         ExecEventHalfBlend(Event_ItemVoice, blend_type)
     elseif item_type == ITEM_SUMMONHORSE then
-        if c_EnableQWOP == FALSE then
-            SetVariable("RideOnSummonTest", 0)
-            SetVariable("IndexItemUseAnim", item_type)
-            SetVariable("ItemDashSpeedIndex", 0)
+        SetVariable("RideOnSummonTest", 0)
+        SetVariable("IndexItemUseAnim", item_type)
+        SetVariable("ItemDashSpeedIndex", 0)
 
-            if GetVariable("MoveSpeedIndex") >= 1 then
-                SetVariable("ItemDashSpeedIndex", 1)
-            end
-            if GetVariable("MoveSpeedLevel") >= 0.8999999761581421 then
-                IsSummonDash = TRUE
-            else
-                IsSummonDash = FALSE
-            end
-
-            ExecEventHalfBlend(Event_ItemDash, blend_type)
+        if GetVariable("MoveSpeedIndex") >= 1 then
+            SetVariable("ItemDashSpeedIndex", 1)
         end
+        if GetVariable("MoveSpeedLevel") >= 0.8999999761581421 then
+            IsSummonDash = TRUE
+        else
+            IsSummonDash = FALSE
+        end
+
+        ExecEventHalfBlend(Event_ItemDash, blend_type)
     elseif item_type == ITEM_VOICE then -- Duplicate Condition #2
         ExecEventHalfBlend(Event_ItemReturnBuddy, blend_type)
     elseif item_type == ITEM_SUMMONBUDDY then
@@ -4102,10 +4100,6 @@ function GetHandChangeType(hand)
 end
 
 function ExecJump()
-    if c_EnableQWOP == TRUE then
-        return FALSE
-    end
-
     -- Note: Restored original value during full remake. Repo values was ACTION_ARM_JUMP instead of ACTION_ARM_CHANGE_STYLE
     -- note: Original decompile of 1.10 has ACTION_ARM_CHANGE_STYLE instead of jump
     if env(ActionRequest, ACTION_ARM_CHANGE_STYLE) == FALSE and env(IsAIJumpRequested) == FALSE then
