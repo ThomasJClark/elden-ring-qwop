@@ -1,31 +1,15 @@
+mod constants;
+mod helpers;
+
 use std::f32::consts::PI;
 use std::ops::DerefMut;
-use wrapped2d::b2::{
-    BodyDef, BodyHandle, BodyType, Filter, FixtureDef, Joint, JointHandle, PolygonShape,
-    RevoluteJointDef, UnknownJoint, Vec2,
-};
+use wrapped2d::b2::{BodyHandle, Joint, JointHandle, UnknownJoint, Vec2};
 
-type World = wrapped2d::b2::World<wrapped2d::user_data::NoUserData>;
-
-const WORLD_WIDTH: f32 = 99999.0;
-const WORLD_HEIGHT: f32 = 20.0;
-const CATEGORY_GROUND: u16 = 0x0001;
-const CATEGORY_PLAYER: u16 = 0x0002;
-const MASK_NO_SELF: u16 = 0xfffd;
-const MASK_ALL: u16 = 0xffff;
-const GROUND_HALF_WIDTH: f32 = 10.0 * WORLD_WIDTH;
-const GROUND_HALF_HEIGHT: f32 = 0.5;
-const QWOP_TO_WORLD_SCALE: f32 = 9.0;
-const INITIAL_POSITION_OFFSET: Vec2 = Vec2 { x: 0.0, y: 9.0 };
-const RESET_TIME: f32 = 1.5;
-
-/// QWOP runs at 30 FPS, but the Box2D physics world is updated by 40 ms per frame. Speed up time by
-/// this ratio to preserve speed of real QWOP
-const QWOP_TIME_DILATION: f32 = 30.0 * 0.04;
+use constants::*;
 
 /// A headless implementation of QWOP
 pub struct QwopPhysics {
-    world: World,
+    world: helpers::World,
     ground: BodyHandle,
     torso: BodyHandle,
     head: BodyHandle,
@@ -62,138 +46,14 @@ pub struct QwopPhysics {
 
 unsafe impl Send for QwopPhysics {}
 
-fn create_ground_body(world: &mut World) -> BodyHandle {
-    let body_handle = world.create_body(&BodyDef {
-        body_type: BodyType::Static,
-        position: Vec2 {
-            x: WORLD_WIDTH / 2.0,
-            y: WORLD_HEIGHT - GROUND_HALF_HEIGHT,
-        },
-        ..BodyDef::new()
-    });
-
-    world.body_mut(body_handle).create_fixture(
-        &PolygonShape::new_box(GROUND_HALF_WIDTH, GROUND_HALF_HEIGHT),
-        &mut FixtureDef {
-            friction: 0.2,
-            density: 20.0,
-            filter: Filter {
-                category_bits: CATEGORY_GROUND,
-                mask_bits: MASK_ALL,
-                ..Filter::new()
-            },
-            ..FixtureDef::new()
-        },
-    );
-
-    body_handle
-}
-
-struct BodyOptions<'a> {
-    world: &'a mut World,
-    x: f32,
-    y: f32,
-    angle: f32,
-    hw: f32,
-    hh: f32,
-    friction: f32,
-    density: f32,
-}
-
-fn create_player_body(
-    BodyOptions {
-        world,
-        x,
-        y,
-        angle,
-        hw,
-        hh,
-        friction,
-        density,
-    }: BodyOptions,
-) -> BodyHandle {
-    let body_handle = world.create_body(&BodyDef {
-        body_type: BodyType::Dynamic,
-        position: Vec2 { x, y } + INITIAL_POSITION_OFFSET,
-        angle,
-        ..BodyDef::new()
-    });
-
-    world.body_mut(body_handle).create_fixture(
-        &PolygonShape::new_box(hw, hh),
-        &mut FixtureDef {
-            friction,
-            density,
-            filter: Filter {
-                category_bits: CATEGORY_PLAYER,
-                mask_bits: MASK_NO_SELF,
-                ..Filter::new()
-            },
-            ..FixtureDef::new()
-        },
-    );
-
-    body_handle
-}
-
-struct JointOptions<'a> {
-    world: &'a mut World,
-    body_a: BodyHandle,
-    body_b: BodyHandle,
-    anchor_a_x: f32,
-    anchor_a_y: f32,
-    anchor_b_x: f32,
-    anchor_b_y: f32,
-    lower_angle: f32,
-    upper_angle: f32,
-    reference_angle: f32,
-    enable_motor: bool,
-    max_motor_torque: f32,
-}
-
-fn create_player_joint(
-    JointOptions {
-        world,
-        body_a,
-        body_b,
-        anchor_a_x,
-        anchor_a_y,
-        anchor_b_x,
-        anchor_b_y,
-        lower_angle,
-        upper_angle,
-        reference_angle,
-        enable_motor,
-        max_motor_torque,
-    }: JointOptions,
-) -> JointHandle {
-    world.create_joint(&RevoluteJointDef {
-        local_anchor_a: Vec2 {
-            x: anchor_a_x,
-            y: anchor_a_y,
-        },
-        local_anchor_b: Vec2 {
-            x: anchor_b_x,
-            y: anchor_b_y,
-        },
-        reference_angle,
-        enable_limit: true,
-        lower_angle,
-        upper_angle,
-        enable_motor,
-        max_motor_torque,
-        ..RevoluteJointDef::new(body_a, body_b)
-    })
-}
-
-impl QwopPhysics {
+impl Default for QwopPhysics {
     #[allow(clippy::excessive_precision)]
-    pub fn new() -> Self {
-        let mut world = World::new(&Vec2 { x: 0.0, y: 10.0 });
+    fn default() -> Self {
+        let mut world = helpers::World::new(&Vec2 { x: 0.0, y: 10.0 });
 
-        let ground = create_ground_body(&mut world);
+        let ground = helpers::create_ground_body(&mut world);
 
-        let torso = create_player_body(BodyOptions {
+        let torso = helpers::create_player_body(helpers::BodyOptions {
             world: &mut world,
             x: 2.5111726226000157,
             y: -1.8709517533957938,
@@ -203,7 +63,7 @@ impl QwopPhysics {
             friction: 0.2,
             density: 1.0,
         });
-        let head = create_player_body(BodyOptions {
+        let head = helpers::create_player_body(helpers::BodyOptions {
             world: &mut world,
             x: 3.888130278719558,
             y: -5.621802929095265,
@@ -213,7 +73,7 @@ impl QwopPhysics {
             friction: 0.2,
             density: 1.0,
         });
-        let left_arm = create_player_body(BodyOptions {
+        let left_arm = helpers::create_player_body(helpers::BodyOptions {
             world: &mut world,
             x: 4.417861014480877,
             y: -2.806563606410589,
@@ -223,7 +83,7 @@ impl QwopPhysics {
             friction: 0.2,
             density: 1.0,
         });
-        let left_forearm = create_player_body(BodyOptions {
+        let left_forearm = helpers::create_player_body(helpers::BodyOptions {
             world: &mut world,
             x: 5.830008603424893,
             y: -2.8733539631159584,
@@ -233,7 +93,7 @@ impl QwopPhysics {
             friction: 0.2,
             density: 1.0,
         });
-        let left_thigh = create_player_body(BodyOptions {
+        let left_thigh = helpers::create_player_body(helpers::BodyOptions {
             world: &mut world,
             x: 2.5648987628203876,
             y: 1.648090668682522,
@@ -243,7 +103,7 @@ impl QwopPhysics {
             friction: 0.2,
             density: 1.0,
         });
-        let left_calf = create_player_body(BodyOptions {
+        let left_calf = helpers::create_player_body(helpers::BodyOptions {
             world: &mut world,
             x: 3.12585731974087,
             y: 5.525511655361298,
@@ -253,7 +113,7 @@ impl QwopPhysics {
             friction: 0.2,
             density: 1.0,
         });
-        let left_foot = create_player_body(BodyOptions {
+        let left_foot = helpers::create_player_body(helpers::BodyOptions {
             world: &mut world,
             x: 3.926921842806667,
             y: 8.08884032049622,
@@ -263,7 +123,7 @@ impl QwopPhysics {
             friction: 1.5,
             density: 3.0,
         });
-        let right_arm = create_player_body(BodyOptions {
+        let right_arm = helpers::create_player_body(helpers::BodyOptions {
             world: &mut world,
             x: 1.1812303663272852,
             y: -3.5000256518601014,
@@ -273,7 +133,7 @@ impl QwopPhysics {
             friction: 0.2,
             density: 1.0,
         });
-        let right_forearm = create_player_body(BodyOptions {
+        let right_forearm = helpers::create_player_body(helpers::BodyOptions {
             world: &mut world,
             x: 0.4078206420797428,
             y: -1.0599953233084172,
@@ -283,7 +143,7 @@ impl QwopPhysics {
             friction: 0.2,
             density: 1.0,
         });
-        let right_thigh = create_player_body(BodyOptions {
+        let right_thigh = helpers::create_player_body(helpers::BodyOptions {
             world: &mut world,
             x: 1.6120186135678773,
             y: 2.0615320561881516,
@@ -293,7 +153,7 @@ impl QwopPhysics {
             friction: 0.2,
             density: 1.0,
         });
-        let right_calf = create_player_body(BodyOptions {
+        let right_calf = helpers::create_player_body(helpers::BodyOptions {
             world: &mut world,
             x: -0.07253905736790486,
             y: 5.347881871063159,
@@ -303,7 +163,7 @@ impl QwopPhysics {
             friction: 0.2,
             density: 1.0,
         });
-        let right_foot = create_player_body(BodyOptions {
+        let right_foot = helpers::create_player_body(helpers::BodyOptions {
             world: &mut world,
             x: -1.1254742643908706,
             y: 7.567193169625567,
@@ -313,7 +173,7 @@ impl QwopPhysics {
             friction: 1.5,
             density: 3.0,
         });
-        let neck = create_player_joint(JointOptions {
+        let neck = helpers::create_player_joint(helpers::JointOptions {
             world: &mut world,
             body_a: head,
             body_b: torso,
@@ -327,7 +187,7 @@ impl QwopPhysics {
             enable_motor: false,
             max_motor_torque: 0.0,
         });
-        let left_shoulder = create_player_joint(JointOptions {
+        let left_shoulder = helpers::create_player_joint(helpers::JointOptions {
             world: &mut world,
             body_a: left_arm,
             body_b: torso,
@@ -341,7 +201,7 @@ impl QwopPhysics {
             enable_motor: true,
             max_motor_torque: 1000.0,
         });
-        let left_hip = create_player_joint(JointOptions {
+        let left_hip = helpers::create_player_joint(helpers::JointOptions {
             world: &mut world,
             body_a: left_thigh,
             body_b: torso,
@@ -355,7 +215,7 @@ impl QwopPhysics {
             enable_motor: true,
             max_motor_torque: 6000.0,
         });
-        let left_elbow = create_player_joint(JointOptions {
+        let left_elbow = helpers::create_player_joint(helpers::JointOptions {
             world: &mut world,
             body_a: left_forearm,
             body_b: left_arm,
@@ -369,7 +229,7 @@ impl QwopPhysics {
             enable_motor: false,
             max_motor_torque: 0.0,
         });
-        let left_knee = create_player_joint(JointOptions {
+        let left_knee = helpers::create_player_joint(helpers::JointOptions {
             world: &mut world,
             body_a: left_calf,
             body_b: left_thigh,
@@ -383,7 +243,7 @@ impl QwopPhysics {
             enable_motor: true,
             max_motor_torque: 3000.0,
         });
-        let left_ankle = create_player_joint(JointOptions {
+        let left_ankle = helpers::create_player_joint(helpers::JointOptions {
             world: &mut world,
             body_a: left_foot,
             body_b: left_calf,
@@ -397,7 +257,7 @@ impl QwopPhysics {
             enable_motor: false,
             max_motor_torque: 2000.0,
         });
-        let right_shoulder = create_player_joint(JointOptions {
+        let right_shoulder = helpers::create_player_joint(helpers::JointOptions {
             world: &mut world,
             body_a: right_arm,
             body_b: torso,
@@ -411,7 +271,7 @@ impl QwopPhysics {
             enable_motor: true,
             max_motor_torque: 1000.0,
         });
-        let right_hip = create_player_joint(JointOptions {
+        let right_hip = helpers::create_player_joint(helpers::JointOptions {
             world: &mut world,
             body_a: right_thigh,
             body_b: torso,
@@ -425,7 +285,7 @@ impl QwopPhysics {
             enable_motor: true,
             max_motor_torque: 6000.0,
         });
-        let right_elbow = create_player_joint(JointOptions {
+        let right_elbow = helpers::create_player_joint(helpers::JointOptions {
             world: &mut world,
             body_a: right_forearm,
             body_b: right_arm,
@@ -439,7 +299,7 @@ impl QwopPhysics {
             enable_motor: false,
             max_motor_torque: 0.0,
         });
-        let right_knee = create_player_joint(JointOptions {
+        let right_knee = helpers::create_player_joint(helpers::JointOptions {
             world: &mut world,
             body_a: right_calf,
             body_b: right_thigh,
@@ -453,7 +313,7 @@ impl QwopPhysics {
             enable_motor: true,
             max_motor_torque: 3000.0,
         });
-        let right_ankle = create_player_joint(JointOptions {
+        let right_ankle = helpers::create_player_joint(helpers::JointOptions {
             world: &mut world,
             body_a: right_foot,
             body_b: right_calf,
@@ -497,7 +357,9 @@ impl QwopPhysics {
             fall_reset_time: None,
         }
     }
+}
 
+impl QwopPhysics {
     /// Set the inputs for the physics simulation
     pub fn control(&mut self, q: bool, w: bool, o: bool, p: bool) {
         let set_motor_speed = |joint_handle: JointHandle, speed: f32| {
@@ -582,7 +444,7 @@ impl QwopPhysics {
     }
 
     pub fn reset(&mut self) {
-        *self = Self::new();
+        *self = Self::default();
     }
 
     pub fn root_angle(&self) -> f32 {

@@ -1,11 +1,14 @@
-use crate::keybindings::Keybindings;
+mod keybindings;
+
 use eldenring::{cs::UserInputKey, fd4::FD4PadManager};
 use fromsoftware_shared::FromStatic;
+use keybindings::Keybindings;
 
 /// Manages input state for QWOP, and updates the keybindings when QWOP is enabled. Note that
 /// the FD4Pad system is used for input instead of raw Windows APIs so that the keybindings can
 /// be changed in the game settings, so we need to change the actual game keybinding settings when
 /// QWOP is enabled and disabled
+#[derive(Default)]
 pub struct QwopInputState {
     pub q: bool,
     pub w: bool,
@@ -25,19 +28,6 @@ pub struct QwopInputState {
 }
 
 impl QwopInputState {
-    pub fn new() -> Self {
-        Self {
-            q: false,
-            w: false,
-            o: false,
-            p: false,
-            disabled: false,
-            prev_disable_key_pressed: false,
-            initialized_keybindings: false,
-            keybindings: Default::default(),
-        }
-    }
-
     pub fn poll(&mut self) {
         if self.initialized_keybindings
             && let Ok(pad_manager) = (unsafe { FD4PadManager::instance() })
