@@ -1,9 +1,10 @@
+use core::f32;
 use glam::vec4;
 use std::ptr::NonNull;
 
 use eldenring::{
     cs::{CSCamera, ChrCtrl, ChrInsExt, EquipParamGoods, SoloParamRepository, WorldChrMan},
-    havok::HkQuaternion,
+    havok::{HkQuaternion, HkVector4},
 };
 use fromsoftware_shared::FromStatic;
 
@@ -17,11 +18,14 @@ const FALLEN_SP_EFFECT_ID: i32 = 67;
 /// EquipParamGoods for the horse summon wistle. Horse is banned because it trivializes movement
 const SPECTRAL_STEED_WHISTLE_GOODS_ID: u32 = 130;
 
+const DAMPING: f32 = 3.0;
+
 #[derive(Default)]
 pub struct QwopMod {
-    pub input_state: QwopInputState,
-    pub physics: QwopPhysics,
-    pub prev_main_player_loaded: bool,
+    input_state: QwopInputState,
+    physics: QwopPhysics,
+    prev_main_player_loaded: bool,
+    displacement: HkVector4,
 }
 
 unsafe impl Sync for QwopMod {}
@@ -46,6 +50,7 @@ impl QwopMod {
         if !self.prev_main_player_loaded {
             self.physics.reset();
             self.prev_main_player_loaded = true;
+            self.displacement = HkVector4::ZERO;
         }
 
         self.input_state.poll();
@@ -86,7 +91,7 @@ impl QwopMod {
     /// Update the player's root motion based on the current QWOP physics state. This must be done
     /// in a hook in the middle of the HavokBehavior task group, after the player's root motion has
     /// been set but before it is applied.
-    pub fn chr_ctrl_update_pos_hook(&self, chr_ctrl: NonNull<ChrCtrl>) {
+    pub fn chr_ctrl_update_pos_hook(&mut self, chr_ctrl: NonNull<ChrCtrl>) {
         if let Ok(world_chr_man) = unsafe { WorldChrMan::instance_mut() }
             && let Some(player) = &mut world_chr_man.main_player
             && player.as_ptr() as *const _ == unsafe { chr_ctrl.as_ref() }.owner.as_ptr()
@@ -96,19 +101,31 @@ impl QwopMod {
             }
 
             let velocity = self.physics.velocity();
+            let frame_time = player.modules.hitstop.frame_time;
+
+            // Allow root motion from animation and physics, but keep track of the total
+            // displacement and damp it over time. This ensures players can't cheese movement
+            // in the long term by attacking, but attacks don't lose out on short term reach.
+            player.modules.behavior.root_motion -= DAMPING * self.displacement * frame_time;
+            self.displacement += player.modules.behavior.root_motion;
+            self.displacement.w = 0.0; // Gravity and jumping are OK
 
             // Note that root_motion is already in player coordinates
-            player.modules.behavior.root_motion =
-                vec4(0.0, 0.0, -velocity, 0.0) * player.modules.hitstop.frame_time;
+            player.modules.behavior.root_motion += vec4(0.0, 0.0, -velocity, 0.0) * frame_time;
 
             // While the player is in motion, face right relative to the camera like in QWOP. There is
             // no way to turn in three dimensions in QWOP, so we can make do by turning the camera
-            if velocity.abs() > 0.1
-                && let Ok(cs_camera) = unsafe { CSCamera::instance() }
-            {
-                let camera_rotation: glam::Mat3A = cs_camera.pers_cam_2.matrix.rotation();
-                // player.modules.physics.orientation = HkQuaternion::from_rotation_y(0.0);
-                player.modules.physics.orientation = HkQuaternion::from_mat3a(&camera_rotation);
+            let snap_rotation = self.input_state.q
+                || self.input_state.w
+                || self.input_state.o
+                || self.input_state.p;
+
+            if snap_rotation && let Ok(cs_camera) = unsafe { CSCamera::instance() } {
+                let camera_matrix = cs_camera.pers_cam_2.matrix;
+                let camera_angle = f32::atan2(camera_matrix.0.2, camera_matrix.2.2);
+                player.modules.physics.orientation = HkQuaternion::from_rotation_y(
+                    -(camera_angle + (90.0 + 60.0) * (f32::consts::PI / 180.0)),
+                );
             }
         }
     }
