@@ -31,10 +31,6 @@ use crate::qwop_mod::QwopMod;
 
 static QWOP_MOD: SyncUnsafeCell<Option<QwopMod>> = SyncUnsafeCell::new(None);
 
-fn qwop_mod_instance() -> &'static mut QwopMod {
-    unsafe { QWOP_MOD.get().as_mut_unchecked() }.get_or_insert_default()
-}
-
 retour::static_detour! {
     static ChrCtrl_UpdatePos: extern "C" fn(NonNull<ChrCtrl>);
     static ChrIns_BehaviorSafe: extern "C" fn(NonNull<WorldChrMan>);
@@ -59,7 +55,11 @@ pub extern "C" fn DllMain(module: HINSTANCE, reason: u32) -> bool {
     std::thread::spawn(move || {
         let cs_task = CSTaskImp::wait_for_instance(Duration::MAX).unwrap();
         cs_task.run_recurring(
-            |_: &FD4TaskData| qwop_mod_instance().chr_ins_pre_behavior(),
+            |_: &FD4TaskData| {
+                unsafe { QWOP_MOD.get().as_mut_unchecked() }
+                    .get_or_insert_default()
+                    .chr_ins_pre_behavior()
+            },
             CSTaskGroupIndex::ChrIns_PreBehavior,
         );
 
@@ -70,7 +70,12 @@ pub extern "C" fn DllMain(module: HINSTANCE, reason: u32) -> bool {
                 .initialize(
                     retour::Function::from_ptr(rva_to_ptr(rvas::CHR_CTRL_UPDATE_POS)),
                     |chr_ctrl| {
-                        qwop_mod_instance().chr_ctrl_update_pos_hook(chr_ctrl);
+                        QWOP_MOD
+                            .get()
+                            .as_mut_unchecked()
+                            .get_or_insert_default()
+                            .chr_ctrl_update_pos_hook(chr_ctrl);
+
                         ChrCtrl_UpdatePos.call(chr_ctrl);
                     },
                 )
@@ -82,7 +87,12 @@ pub extern "C" fn DllMain(module: HINSTANCE, reason: u32) -> bool {
                 .initialize(
                     retour::Function::from_ptr(rva_to_ptr(rvas::CHR_INS_BEHAVIOR_SAFE)),
                     |world_chr_man| {
-                        qwop_mod_instance().chr_ins_behavior_safe_hook(world_chr_man);
+                        QWOP_MOD
+                            .get()
+                            .as_mut_unchecked()
+                            .get_or_insert_default()
+                            .chr_ins_behavior_safe_hook(world_chr_man);
+
                         ChrIns_BehaviorSafe.call(world_chr_man);
                     },
                 )

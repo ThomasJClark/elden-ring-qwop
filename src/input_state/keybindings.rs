@@ -13,7 +13,6 @@ pub struct Keybindings {
     move_right: CSKeyboardKey,
     crouch_stand_up: CSKeyboardKey,
     backstep_dodge_roll_dash: CSKeyboardKey,
-    jump: CSKeyboardKey,
     reset_camera_lock_on_remove_target: CSKeyboardKey,
 }
 
@@ -27,7 +26,6 @@ impl Default for Keybindings {
             move_right: CSKeyboardKey::P,
             crouch_stand_up: CSKeyboardKey::None,
             backstep_dodge_roll_dash: CSKeyboardKey::None,
-            jump: CSKeyboardKey::None,
             reset_camera_lock_on_remove_target: CSKeyboardKey::None,
         }
     }
@@ -52,7 +50,6 @@ impl Keybindings {
             move_right: get_key(KeyAssignID::MoveRight),
             crouch_stand_up: get_key(KeyAssignID::CrouchStandUp),
             backstep_dodge_roll_dash: get_key(KeyAssignID::BackstepDodgeRollDash),
-            jump: get_key(KeyAssignID::Jump),
             reset_camera_lock_on_remove_target: get_key(KeyAssignID::ResetCameraLockOnRemoveTarget),
         }
     }
@@ -66,7 +63,6 @@ impl Keybindings {
             move_right: CSKeyboardKey::D,
             crouch_stand_up: CSKeyboardKey::C,
             backstep_dodge_roll_dash: CSKeyboardKey::LeftShift,
-            jump: CSKeyboardKey::Space,
             reset_camera_lock_on_remove_target: CSKeyboardKey::Q,
         }
     }
@@ -101,7 +97,6 @@ impl Keybindings {
             KeyAssignID::BackstepDodgeRollDash,
             self.backstep_dodge_roll_dash,
         );
-        assign_key(KeyAssignID::Jump, self.jump);
         assign_key(
             KeyAssignID::ResetCameraLockOnRemoveTarget,
             self.reset_camera_lock_on_remove_target,

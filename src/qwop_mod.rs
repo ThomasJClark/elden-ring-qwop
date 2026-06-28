@@ -1,12 +1,12 @@
 use core::f32;
-use glam::vec4;
 use std::ptr::NonNull;
 
-use eldenring::{
-    cs::{CSCamera, ChrCtrl, ChrInsExt, EquipParamGoods, SoloParamRepository, WorldChrMan},
-    havok::{HkQuaternion, HkVector4},
+use eldenring::cs::{
+    CSCamera, ChrCtrl, ChrInsExt, EquipParamGoods, SoloParamRepository, WorldChrMan,
 };
+use eldenring::havok::HkQuaternion;
 use fromsoftware_shared::FromStatic;
+use glam::{Vec3, Vec4, Vec4Swizzles};
 
 use crate::input_state::QwopInputState;
 use crate::physics::QwopPhysics;
@@ -15,17 +15,27 @@ use crate::player_ins_skeleton_ext::PlayerInsSkeletonExt;
 /// SpEffectParam that applies damage and blood splatter VFX after falling
 const FALLEN_SP_EFFECT_ID: i32 = 67;
 
+/// SpEffectParam active while the player is resting at a grace. QWOP is disabled in this state.
+const SITE_OF_LOST_GRACE_SP_EFFECT_ID: i32 = 9607;
+
 /// EquipParamGoods for the horse summon wistle. Horse is banned because it trivializes movement
 const SPECTRAL_STEED_WHISTLE_GOODS_ID: u32 = 130;
 
-const DAMPING: f32 = 3.0;
+/// True QWOP (2D side scroller view) would be 90 degrees, but a slight offset from that makes it
+/// easier to see enemies in the direction that the player attacks
+const CAMERA_ANGLE_OFFSET: f32 = 150.0_f32.to_radians();
+
+const CAMERA_ROTATION_SPEED: f32 = 540.0_f32.to_radians();
+
+const DAMPING: f32 = 4.0;
 
 #[derive(Default)]
 pub struct QwopMod {
     input_state: QwopInputState,
     physics: QwopPhysics,
     prev_main_player_loaded: bool,
-    displacement: HkVector4,
+    displacement: Vec3,
+    qwop_enabled: bool,
 }
 
 unsafe impl Sync for QwopMod {}
@@ -37,8 +47,7 @@ impl QwopMod {
     /// simulation, and updates any game state that doesn't need to be a in a specific hook or task
     /// group to avoid getting overwritten.
     pub fn chr_ins_pre_behavior(&mut self) {
-        let Some(player) = unsafe { WorldChrMan::instance_mut() }
-            .ok()
+        let Some(player) = unsafe { WorldChrMan::instance_mut().ok() }
             .and_then(|world_chr_man| world_chr_man.main_player.as_mut())
         else {
             self.prev_main_player_loaded = false;
@@ -50,14 +59,18 @@ impl QwopMod {
         if !self.prev_main_player_loaded {
             self.physics.reset();
             self.prev_main_player_loaded = true;
-            self.displacement = HkVector4::ZERO;
+            self.displacement = Vec3::ZERO;
         }
 
         self.input_state.poll();
 
-        let qwop_enabled = !self.input_state.disabled;
+        self.qwop_enabled = !self.input_state.disabled
+            && !player
+                .special_effect
+                .entries()
+                .any(|entry| entry.param_id == SITE_OF_LOST_GRACE_SP_EFFECT_ID);
 
-        if qwop_enabled {
+        if self.qwop_enabled {
             self.physics.control(
                 self.input_state.q,
                 self.input_state.w,
@@ -76,7 +89,7 @@ impl QwopMod {
         // No normal walking or horse allowed while QWOP is enabled.
         // TODO: disable evasion actions (roll, sneak, backstep) as well. Currently these are
         // controlled in HKS, which isn't aware of the mod's enabled/disabled status
-        player.debug_flags.set_disabled_movement(qwop_enabled);
+        player.debug_flags.set_disabled_movement(self.qwop_enabled);
 
         if let Some(horse_whistle) = unsafe { SoloParamRepository::instance_mut() }
             .ok()
@@ -84,7 +97,7 @@ impl QwopMod {
                 solo_param_repository.get_mut::<EquipParamGoods>(SPECTRAL_STEED_WHISTLE_GOODS_ID)
             })
         {
-            horse_whistle.set_enable_live(!qwop_enabled)
+            horse_whistle.set_enable_live(!self.qwop_enabled)
         }
     }
 
@@ -92,42 +105,50 @@ impl QwopMod {
     /// in a hook in the middle of the HavokBehavior task group, after the player's root motion has
     /// been set but before it is applied.
     pub fn chr_ctrl_update_pos_hook(&mut self, chr_ctrl: NonNull<ChrCtrl>) {
-        if let Ok(world_chr_man) = unsafe { WorldChrMan::instance_mut() }
-            && let Some(player) = &mut world_chr_man.main_player
-            && player.as_ptr() as *const _ == unsafe { chr_ctrl.as_ref() }.owner.as_ptr()
-        {
-            if self.input_state.disabled {
-                return;
-            }
-
-            let velocity = self.physics.velocity();
-            let frame_time = player.modules.hitstop.frame_time;
-
-            // Allow root motion from animation and physics, but keep track of the total
-            // displacement and damp it over time. This ensures players can't cheese movement
-            // in the long term by attacking, but attacks don't lose out on short term reach.
-            player.modules.behavior.root_motion -= DAMPING * self.displacement * frame_time;
-            self.displacement += player.modules.behavior.root_motion;
-            self.displacement.w = 0.0; // Gravity and jumping are OK
-
-            // Note that root_motion is already in player coordinates
-            player.modules.behavior.root_motion += vec4(0.0, 0.0, -velocity, 0.0) * frame_time;
-
-            // While the player is in motion, face right relative to the camera like in QWOP. There is
-            // no way to turn in three dimensions in QWOP, so we can make do by turning the camera
-            let snap_rotation = self.input_state.q
-                || self.input_state.w
-                || self.input_state.o
-                || self.input_state.p;
-
-            if snap_rotation && let Ok(cs_camera) = unsafe { CSCamera::instance() } {
-                let camera_matrix = cs_camera.pers_cam_2.matrix;
-                let camera_angle = f32::atan2(camera_matrix.0.2, camera_matrix.2.2);
-                player.modules.physics.orientation = HkQuaternion::from_rotation_y(
-                    -(camera_angle + (90.0 + 60.0) * (f32::consts::PI / 180.0)),
-                );
-            }
+        if !self.qwop_enabled {
+            return;
         }
+
+        let Some(player) = unsafe { WorldChrMan::instance_mut().ok() }
+            .and_then(|world_chr_man| world_chr_man.main_player.as_mut())
+            .filter(|player| player.chr_ctrl.as_ptr() == chr_ctrl.as_ptr())
+        else {
+            return;
+        };
+
+        let frame_time = player.modules.hitstop.frame_time;
+        let orientation = player.modules.physics.orientation;
+
+        // While the player is in motion, face right relative to the camera like in QWOP. There is
+        // no way to turn in three dimensions in QWOP, so we can make do by turning the camera
+        let snap_rotation =
+            self.input_state.q || self.input_state.w || self.input_state.o || self.input_state.p;
+
+        if snap_rotation && let Ok(cs_camera) = unsafe { CSCamera::instance() } {
+            let camera_matrix = cs_camera.pers_cam_2.matrix;
+            let camera_angle =
+                f32::atan2(camera_matrix.0.2, camera_matrix.2.2) + CAMERA_ANGLE_OFFSET;
+            let target_rotation = HkQuaternion::from_rotation_y(-camera_angle);
+
+            player.modules.physics.orientation =
+                orientation.rotate_towards(target_rotation, frame_time * CAMERA_ROTATION_SPEED);
+        }
+
+        // Keep track of the cumulative change in world coordinates. The total position is dampened
+        // over time so that animations can cause instantaneous motion but snap back to the original
+        // position. This allows things like stepping forward during an attack or AoW to increase
+        // reach, but prevents the player from using this to move long distances without using QWOP
+        // controls.
+        let local_displacement = orientation
+            .inverse()
+            .mul_vec3(self.displacement)
+            .extend(0.0);
+        player.modules.behavior.root_motion -= frame_time * DAMPING * local_displacement;
+        self.displacement += orientation
+            .mul_vec3(player.modules.behavior.root_motion.xyz())
+            .with_y(0.0);
+
+        player.modules.behavior.root_motion += frame_time * -self.physics.velocity() * Vec4::Z;
     }
 
     /// Update the main player's skeleton pose based on the current QWOP physics state
@@ -138,7 +159,7 @@ impl QwopMod {
 
         player.set_ragdoll(false);
 
-        if self.input_state.disabled {
+        if !self.qwop_enabled {
             return;
         }
 
