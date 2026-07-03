@@ -21,11 +21,7 @@ const SITE_OF_LOST_GRACE_SP_EFFECT_ID: i32 = 9607;
 /// EquipParamGoods for the horse summon wistle. Horse is banned because it trivializes movement
 const SPECTRAL_STEED_WHISTLE_GOODS_ID: u32 = 130;
 
-/// True QWOP (2D side scroller view) would be 90 degrees, but a slight offset from that makes it
-/// easier to see enemies in the direction that the player attacks
-const CAMERA_ANGLE_OFFSET: f32 = 150.0_f32.to_radians();
-
-const CAMERA_ROTATION_SPEED: f32 = 540.0_f32.to_radians();
+const ROTATION_SPEED: f32 = 540.0_f32.to_radians();
 
 /// Time in seconds to visually transition between QWOP enabled and disabled states
 const TRANSITION_TIME: f32 = 0.4;
@@ -135,19 +131,33 @@ impl QwopMod {
         let frame_time = player.modules.hitstop.frame_time;
         let orientation = player.modules.physics.orientation;
 
-        // While the player is in motion, face right relative to the camera like in QWOP. There is
-        // no way to turn in three dimensions in QWOP, so we can make do by turning the camera
-        let snap_rotation =
-            self.input_state.q || self.input_state.w || self.input_state.o || self.input_state.p;
+        if let Ok(cs_camera) = unsafe { CSCamera::instance() } {
+            let target_angle = {
+                let camera_matrix = cs_camera.pers_cam_2.matrix;
+                let camera_angle = f32::atan2(camera_matrix.0.2, camera_matrix.2.2);
 
-        if snap_rotation && let Ok(cs_camera) = unsafe { CSCamera::instance() } {
-            let camera_matrix = cs_camera.pers_cam_2.matrix;
-            let camera_angle =
-                f32::atan2(camera_matrix.0.2, camera_matrix.2.2) + CAMERA_ANGLE_OFFSET;
-            let target_rotation = HkQuaternion::from_rotation_y(-camera_angle);
+                if player.is_locked_on {
+                    // Face the target enemy while locked on
+                    Some(camera_angle + 180.0_f32.to_radians())
+                } else if self.input_state.q
+                    || self.input_state.w
+                    || self.input_state.o
+                    || self.input_state.p
+                {
+                    // Face to the right while moving and not locked on (like the 2D side-scrolling
+                    // view in the original QWOP)
+                    Some(camera_angle + 90.0_f32.to_radians())
+                } else {
+                    None
+                }
+            };
 
-            player.modules.physics.orientation =
-                orientation.rotate_towards(target_rotation, frame_time * CAMERA_ROTATION_SPEED);
+            if let Some(target_angle) = target_angle {
+                let target_rotation = HkQuaternion::from_rotation_y(-target_angle);
+
+                player.modules.physics.orientation =
+                    orientation.rotate_towards(target_rotation, frame_time * ROTATION_SPEED);
+            }
         }
 
         // Keep track of the cumulative change in world coordinates. The total position is dampened
