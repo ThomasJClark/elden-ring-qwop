@@ -43,6 +43,7 @@ pub struct BodyOptions<'a> {
     pub hh: f32,
     pub friction: f32,
     pub density: f32,
+    pub mask_bits: u16,
 }
 
 pub fn create_player_body(
@@ -55,6 +56,7 @@ pub fn create_player_body(
         hh,
         friction,
         density,
+        mask_bits,
     }: BodyOptions,
 ) -> BodyHandle {
     let body_handle = world.create_body(&BodyDef {
@@ -71,7 +73,7 @@ pub fn create_player_body(
             density,
             filter: Filter {
                 category_bits: CATEGORY_PLAYER,
-                mask_bits: MASK_NO_SELF,
+                mask_bits,
                 ..Filter::new()
             },
             ..FixtureDef::new()

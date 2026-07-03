@@ -62,6 +62,7 @@ impl Default for QwopPhysics {
             hh: 1.425,
             friction: 0.2,
             density: 1.0,
+            mask_bits: MASK_NO_SELF,
         });
         let head = helpers::create_player_body(helpers::BodyOptions {
             world: &mut world,
@@ -72,6 +73,7 @@ impl Default for QwopPhysics {
             hh: 1.325,
             friction: 0.2,
             density: 1.0,
+            mask_bits: MASK_NO_SELF,
         });
         let left_arm = helpers::create_player_body(helpers::BodyOptions {
             world: &mut world,
@@ -82,6 +84,7 @@ impl Default for QwopPhysics {
             hh: 0.625,
             friction: 0.2,
             density: 1.0,
+            mask_bits: MASK_NONE,
         });
         let left_forearm = helpers::create_player_body(helpers::BodyOptions {
             world: &mut world,
@@ -92,6 +95,7 @@ impl Default for QwopPhysics {
             hh: 0.55,
             friction: 0.2,
             density: 1.0,
+            mask_bits: MASK_NONE,
         });
         let left_thigh = helpers::create_player_body(helpers::BodyOptions {
             world: &mut world,
@@ -102,6 +106,7 @@ impl Default for QwopPhysics {
             hh: 1.0,
             friction: 0.2,
             density: 1.0,
+            mask_bits: MASK_NO_SELF,
         });
         let left_calf = helpers::create_player_body(helpers::BodyOptions {
             world: &mut world,
@@ -112,6 +117,7 @@ impl Default for QwopPhysics {
             hh: 0.75,
             friction: 0.2,
             density: 1.0,
+            mask_bits: MASK_NO_SELF,
         });
         let left_foot = helpers::create_player_body(helpers::BodyOptions {
             world: &mut world,
@@ -122,6 +128,7 @@ impl Default for QwopPhysics {
             hh: 0.675,
             friction: 1.5,
             density: 3.0,
+            mask_bits: MASK_NO_SELF,
         });
         let right_arm = helpers::create_player_body(helpers::BodyOptions {
             world: &mut world,
@@ -132,6 +139,7 @@ impl Default for QwopPhysics {
             hh: 0.75,
             friction: 0.2,
             density: 1.0,
+            mask_bits: MASK_NONE,
         });
         let right_forearm = helpers::create_player_body(helpers::BodyOptions {
             world: &mut world,
@@ -142,6 +150,7 @@ impl Default for QwopPhysics {
             hh: 0.675,
             friction: 0.2,
             density: 1.0,
+            mask_bits: MASK_NONE,
         });
         let right_thigh = helpers::create_player_body(helpers::BodyOptions {
             world: &mut world,
@@ -152,6 +161,7 @@ impl Default for QwopPhysics {
             hh: 1.0,
             friction: 0.2,
             density: 1.0,
+            mask_bits: MASK_NO_SELF,
         });
         let right_calf = helpers::create_player_body(helpers::BodyOptions {
             world: &mut world,
@@ -162,6 +172,7 @@ impl Default for QwopPhysics {
             hh: 0.75,
             friction: 0.2,
             density: 1.0,
+            mask_bits: MASK_NO_SELF,
         });
         let right_foot = helpers::create_player_body(helpers::BodyOptions {
             world: &mut world,
@@ -172,6 +183,7 @@ impl Default for QwopPhysics {
             hh: 0.725,
             friction: 1.5,
             density: 3.0,
+            mask_bits: MASK_NO_SELF,
         });
         let neck = helpers::create_player_joint(helpers::JointOptions {
             world: &mut world,

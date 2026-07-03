@@ -6,6 +6,7 @@ pub const CATEGORY_GROUND: u16 = 0x0001;
 pub const CATEGORY_PLAYER: u16 = 0x0002;
 pub const MASK_NO_SELF: u16 = 0xfffd;
 pub const MASK_ALL: u16 = 0xffff;
+pub const MASK_NONE: u16 = 0x0000;
 pub const GROUND_HALF_WIDTH: f32 = 10.0 * WORLD_WIDTH;
 pub const GROUND_HALF_HEIGHT: f32 = 0.5;
 pub const QWOP_TO_WORLD_SCALE: f32 = 9.0;
