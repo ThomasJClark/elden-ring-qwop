@@ -35,6 +35,7 @@ pub trait PlayerInsSkeletonExt {
         right_knee_angle: f32,
         left_foot_angle: f32,
         right_foot_angle: f32,
+        lerp_amount: f32,
     );
 }
 
@@ -55,6 +56,7 @@ impl PlayerInsSkeletonExt for PlayerIns {
         right_knee_angle: f32,
         left_foot_angle: f32,
         right_foot_angle: f32,
+        lerp_amount: f32,
     ) {
         let Some(havok_context) = &mut self.modules.behavior.havok_context else {
             return;
@@ -68,25 +70,30 @@ impl PlayerInsSkeletonExt for PlayerIns {
         // Update the bone poses to match the QWOP simulation
         for (bone_index, bone) in bones.iter().enumerate() {
             let pose = &mut poses[bone_index];
-            pose.rotation = match bone.name.to_str() {
-                s if LOCK_ROTATION_BONES.contains(s) => reference_poses[bone_index].rotation,
-                "RootPos" => {
-                    pose.translation.y = reference_poses[bone_index].translation.y + elevation;
-                    pose.rotation * HkQuaternion::from_rotation_x(root_angle)
-                }
-                "Neck" => HkQuaternion::from_rotation_y(neck_angle),
-                "L_Thigh" => {
-                    HkQuaternion::from_euler(glam::EulerRot::XZY, 0.0, -PI, left_hip_angle)
-                }
-                "R_Thigh" => {
-                    HkQuaternion::from_euler(glam::EulerRot::XZY, 0.0, -PI, right_hip_angle)
-                }
-                "L_Calf" => HkQuaternion::from_rotation_y(left_knee_angle),
-                "R_Calf" => HkQuaternion::from_rotation_y(right_knee_angle),
-                "L_Foot" => HkQuaternion::from_rotation_y(left_foot_angle),
-                "R_Foot" => HkQuaternion::from_rotation_y(right_foot_angle),
-                _ => pose.rotation,
-            };
+            pose.rotation = pose.rotation.slerp(
+                match bone.name.to_str() {
+                    s if LOCK_ROTATION_BONES.contains(s) => reference_poses[bone_index].rotation,
+                    "RootPos" => {
+                        pose.translation.y = pose.translation.y * (1.0 - lerp_amount)
+                            + (reference_poses[bone_index].translation.y + elevation) * lerp_amount;
+
+                        pose.rotation * HkQuaternion::from_rotation_x(root_angle)
+                    }
+                    "Neck" => HkQuaternion::from_rotation_y(neck_angle),
+                    "L_Thigh" => {
+                        HkQuaternion::from_euler(glam::EulerRot::XZY, 0.0, -PI, left_hip_angle)
+                    }
+                    "R_Thigh" => {
+                        HkQuaternion::from_euler(glam::EulerRot::XZY, 0.0, -PI, right_hip_angle)
+                    }
+                    "L_Calf" => HkQuaternion::from_rotation_y(left_knee_angle),
+                    "R_Calf" => HkQuaternion::from_rotation_y(right_knee_angle),
+                    "L_Foot" => HkQuaternion::from_rotation_y(left_foot_angle),
+                    "R_Foot" => HkQuaternion::from_rotation_y(right_foot_angle),
+                    _ => pose.rotation,
+                },
+                lerp_amount,
+            );
         }
     }
 }

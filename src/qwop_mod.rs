@@ -16,7 +16,7 @@ use crate::player_ins_skeleton_ext::PlayerInsSkeletonExt;
 const FALLEN_SP_EFFECT_ID: i32 = 67;
 
 /// SpEffectParam active while the player is resting at a grace. QWOP is disabled in this state.
-const SITE_OF_LOST_GRACE_SP_EFFECT_ID: i32 = 9607;
+const SITE_OF_LOST_GRACE_SP_EFFECT_ID: i32 = 100690;
 
 /// EquipParamGoods for the horse summon wistle. Horse is banned because it trivializes movement
 const SPECTRAL_STEED_WHISTLE_GOODS_ID: u32 = 130;
@@ -27,7 +27,10 @@ const CAMERA_ANGLE_OFFSET: f32 = 150.0_f32.to_radians();
 
 const CAMERA_ROTATION_SPEED: f32 = 540.0_f32.to_radians();
 
-const DAMPING: f32 = 4.0;
+/// Time in seconds to visually transition between QWOP enabled and disabled states
+const TRANSITION_TIME: f32 = 0.2;
+
+const ROOT_MOTION_DAMPING: f32 = 4.0;
 
 #[derive(Default)]
 pub struct QwopMod {
@@ -36,6 +39,7 @@ pub struct QwopMod {
     prev_main_player_loaded: bool,
     displacement: Vec3,
     qwop_enabled: bool,
+    transition_time: f32,
 }
 
 unsafe impl Sync for QwopMod {}
@@ -60,6 +64,7 @@ impl QwopMod {
             self.physics.reset();
             self.prev_main_player_loaded = true;
             self.displacement = Vec3::ZERO;
+            self.transition_time = 0.0;
         }
 
         self.input_state.poll();
@@ -89,6 +94,12 @@ impl QwopMod {
             if self.physics.just_fallen() {
                 player.apply_speffect(FALLEN_SP_EFFECT_ID, true);
             }
+
+            self.transition_time =
+                (self.transition_time + player.modules.hitstop.frame_time).min(TRANSITION_TIME);
+        } else {
+            self.transition_time =
+                (self.transition_time - player.modules.hitstop.frame_time).max(0.0);
         }
 
         // No normal walking or horse allowed while QWOP is enabled.
@@ -148,7 +159,8 @@ impl QwopMod {
             .inverse()
             .mul_vec3(self.displacement)
             .extend(0.0);
-        player.modules.behavior.root_motion -= frame_time * DAMPING * local_displacement;
+        player.modules.behavior.root_motion -=
+            frame_time * ROOT_MOTION_DAMPING * local_displacement;
         self.displacement += orientation
             .mul_vec3(player.modules.behavior.root_motion.xyz())
             .with_y(0.0);
@@ -164,15 +176,17 @@ impl QwopMod {
 
         player.set_ragdoll(false);
 
-        if !self.qwop_enabled {
-            return;
-        }
-
         // When the player falls per QWOP rules or dies in real life, ragdoll because it's funny
-        if self.physics.fallen() || unsafe { player.player_game_data.as_ref() }.current_hp == 0 {
+        if self.qwop_enabled
+            && (self.physics.fallen()
+                || unsafe { player.player_game_data.as_ref() }.current_hp == 0)
+        {
             player.set_ragdoll(true);
             return;
         }
+
+        let lerp_amount =
+            1.0 - f32::cos(self.transition_time / TRANSITION_TIME * f32::consts::PI / 2.0);
 
         player.set_pose(
             self.physics.elevation(),
@@ -184,6 +198,7 @@ impl QwopMod {
             self.physics.right_knee_angle(),
             self.physics.left_foot_angle(),
             self.physics.right_foot_angle(),
+            lerp_amount,
         );
     }
 }
