@@ -58,6 +58,14 @@
 -- Known issues:
 -- N/A
 
+function ConsolePrint(message)
+    local file = io.open("CONOUT$", "w")
+    if file then
+        file:write(tostring(message) .. "\n")
+        file:close()
+    end
+end
+
 ------------------------------------------
 -- Core: Functions
 ------------------------------------------

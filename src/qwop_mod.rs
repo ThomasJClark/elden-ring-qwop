@@ -2,7 +2,7 @@ use core::f32;
 use std::ptr::NonNull;
 
 use eldenring::cs::{
-    CSCamera, ChrCtrl, ChrInsExt, EquipParamGoods, SoloParamRepository, WorldChrMan,
+    CSCamera, ChrCtrl, ChrInsExt, EquipParamGoods, SoloParamRepository, ThrowNodeState, WorldChrMan,
 };
 use eldenring::havok::HkQuaternion;
 use fromsoftware_shared::FromStatic;
@@ -64,7 +64,12 @@ impl QwopMod {
 
         self.input_state.poll();
 
-        self.qwop_enabled = !self.input_state.disabled
+        self.qwop_enabled =
+            // Disable QWOP if toggled off by the player
+            !self.input_state.disabled
+            // Disable QWOP while performing a crit or being critted
+            && player.modules.throw.throw_node.throw_state == ThrowNodeState::None
+            // Disable QWOP while resting at a bonfire
             && !player
                 .special_effect
                 .entries()
