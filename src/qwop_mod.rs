@@ -16,7 +16,7 @@ use crate::player_ins_skeleton_ext::PlayerInsSkeletonExt;
 const FALLEN_SP_EFFECT_ID: i32 = 67;
 
 /// SpEffectParam active while the player is resting at a grace. QWOP is disabled in this state.
-const SITE_OF_LOST_GRACE_SP_EFFECT_ID: i32 = 100690;
+const SITE_OF_LOST_GRACE_SP_EFFECT_ID: i32 = 9607;
 
 /// EquipParamGoods for the horse summon wistle. Horse is banned because it trivializes movement
 const SPECTRAL_STEED_WHISTLE_GOODS_ID: u32 = 130;
@@ -28,7 +28,7 @@ const CAMERA_ANGLE_OFFSET: f32 = 150.0_f32.to_radians();
 const CAMERA_ROTATION_SPEED: f32 = 540.0_f32.to_radians();
 
 /// Time in seconds to visually transition between QWOP enabled and disabled states
-const TRANSITION_TIME: f32 = 0.2;
+const TRANSITION_TIME: f32 = 0.4;
 
 const ROOT_MOTION_DAMPING: f32 = 4.0;
 
