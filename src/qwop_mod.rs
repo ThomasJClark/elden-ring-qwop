@@ -2,8 +2,11 @@ use core::f32;
 use std::ptr::NonNull;
 
 use eldenring::cs::{
-    CSCamera, ChrCtrl, ChrInsExt, EquipParamGoods, SoloParamRepository, ThrowNodeState, WorldChrMan,
+    CSCamera, CSFeManImp, ChrCtrl, ChrInsExt, EquipParamGoods, MenuString, SoloParamRepository,
+    ThrowNodeState, WorldChrMan,
 };
+use eldenring::dlkr::DLAllocator;
+use eldenring::dltx::DLString;
 use eldenring::havok::HkQuaternion;
 use fromsoftware_shared::FromStatic;
 use glam::{Vec3, Vec4, Vec4Swizzles};
@@ -24,9 +27,12 @@ const SPECTRAL_STEED_WHISTLE_GOODS_ID: u32 = 130;
 const ROTATION_SPEED: f32 = 540.0_f32.to_radians();
 
 /// Time in seconds to visually transition between QWOP enabled and disabled states
-const TRANSITION_TIME: f32 = 0.4;
+const TRANSITION_TIME: f32 = 0.35;
 
 const ROOT_MOTION_DAMPING: f32 = 4.0;
+
+// Conversion factor for QWOP meters to Elden Ring physics units determined by vibes
+const WORLD_SCALE: f32 = 1.1165984;
 
 #[derive(Default)]
 pub struct QwopMod {
@@ -88,6 +94,26 @@ impl QwopMod {
 
             // Apply damage and reset the fallen flag when the player falls
             if self.physics.just_fallen() {
+                if let Ok(fe_man) = unsafe { CSFeManImp::instance_mut() } {
+                    let distance = self.physics.distance() * WORLD_SCALE;
+                    fe_man.frontend_values.area_welcome_message = MenuString {
+                        static_string: std::ptr::null(),
+                        allocated_string: DLString::from_str(
+                            format!(
+                                "You ran <font color=\"{}\">{:.1} meters</font>",
+                                if distance >= 0.0 {
+                                    "#ffcc33"
+                                } else {
+                                    "#770d17"
+                                },
+                                distance
+                            ),
+                            DLAllocator::runtime_heap_allocator(),
+                        )
+                        .unwrap(),
+                    };
+                }
+
                 player.apply_speffect(FALLEN_SP_EFFECT_ID, true);
             }
 
@@ -175,7 +201,8 @@ impl QwopMod {
             .mul_vec3(player.modules.behavior.root_motion.xyz())
             .with_y(0.0);
 
-        player.modules.behavior.root_motion += frame_time * -self.physics.velocity() * Vec4::Z;
+        player.modules.behavior.root_motion +=
+            frame_time * -self.physics.velocity() * WORLD_SCALE * Vec4::Z;
     }
 
     /// Update the main player's skeleton pose based on the current QWOP physics state
@@ -199,7 +226,7 @@ impl QwopMod {
             1.0 - f32::cos(self.transition_time / TRANSITION_TIME * f32::consts::PI / 2.0);
 
         player.set_pose(
-            self.physics.elevation(),
+            self.physics.elevation() * WORLD_SCALE,
             self.physics.root_angle(),
             self.physics.neck_angle(),
             self.physics.left_hip_angle(),

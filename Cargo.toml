@@ -14,8 +14,8 @@ lto = true
 codegen-units = 1
 
 [dependencies]
-eldenring = { git = "https://github.com/ThomasJClark/fromsoftware-rs.git", rev = "4358199c1b" }
-fromsoftware-shared = { git = "https://github.com/ThomasJClark/fromsoftware-rs.git", rev = "4358199c1b" }
+eldenring = { git = "https://github.com/ThomasJClark/fromsoftware-rs.git", rev = "9abf1e24e5" }
+fromsoftware-shared = { git = "https://github.com/ThomasJClark/fromsoftware-rs.git", rev = "9abf1e24e5" }
 glam = "0.32.1"
 pelite = "0.10.0"
 phf = { version = "0.13.1", features = ["macros"] }

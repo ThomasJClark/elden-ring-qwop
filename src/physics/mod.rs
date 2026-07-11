@@ -508,21 +508,19 @@ impl QwopPhysics {
 
     pub fn elevation(&self) -> f32 {
         let left_hip = self.world.joint(self.left_hip);
-        (WORLD_HEIGHT - left_hip.anchor_a().y - 10.0) / QWOP_TO_WORLD_SCALE
+        (WORLD_HEIGHT - left_hip.anchor_a().y - 10.0) / QWOP_TO_METERS_SCALE
+    }
+
+    pub fn distance(&self) -> f32 {
+        let left_hip = self.world.joint(self.left_hip);
+        (left_hip.anchor_a().x - 1.5149934600879298) / QWOP_TO_METERS_SCALE
     }
 
     pub fn velocity(&self) -> f32 {
         let torso = self.world.body(self.torso);
         let left_hip = self.world.joint(self.left_hip);
         let linear_velocity = torso.linear_velocity_from_world_point(&left_hip.anchor_a());
-        let velocity = linear_velocity.x / QWOP_TO_WORLD_SCALE;
-
-        // Bias towards forward velocity to make moving slightly easier than it is in real QWOP
-        if velocity > 0.0 {
-            velocity * 1.5
-        } else {
-            velocity * 0.75
-        }
+        linear_velocity.x / QWOP_TO_METERS_SCALE
     }
 
     pub fn fallen(&self) -> bool {

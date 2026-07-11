@@ -9,10 +9,13 @@ pub const MASK_ALL: u16 = 0xffff;
 pub const MASK_NONE: u16 = 0x0000;
 pub const GROUND_HALF_WIDTH: f32 = 10.0 * WORLD_WIDTH;
 pub const GROUND_HALF_HEIGHT: f32 = 0.5;
-pub const QWOP_TO_WORLD_SCALE: f32 = 9.0;
 pub const INITIAL_POSITION_OFFSET: Vec2 = Vec2 { x: 0.0, y: 9.0 };
 pub const RESET_TIME: f32 = 1.5;
 
 /// QWOP runs at 30 FPS, but the Box2D physics world is updated by 40 ms per frame. Speed up time by
 /// this ratio to preserve speed of real QWOP
 pub const QWOP_TIME_DILATION: f32 = 30.0 * 0.04;
+
+/// QWOP physical units are divided by 10 to calculate the score for the "you ran x meters" screen.
+/// Treating this as units in the Elden Ring world seems to work nicely.
+pub const QWOP_TO_METERS_SCALE: f32 = 10.0;
