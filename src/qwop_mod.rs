@@ -42,6 +42,7 @@ pub struct QwopMod {
     displacement: Vec3,
     qwop_enabled: bool,
     transition_time: f32,
+    cheese_discovered: bool,
 }
 
 unsafe impl Sync for QwopMod {}
@@ -92,10 +93,11 @@ impl QwopMod {
 
             self.physics.step(player.modules.hitstop.frame_time);
 
+            let distance = self.physics.distance();
+
             // Apply damage and reset the fallen flag when the player falls
             if self.physics.just_fallen() {
                 if let Ok(fe_man) = unsafe { CSFeManImp::instance_mut() } {
-                    let distance = self.physics.distance() * WORLD_SCALE;
                     fe_man.frontend_values.area_welcome_message = MenuString {
                         static_string: std::ptr::null(),
                         allocated_string: DLString::from_str(
@@ -115,6 +117,16 @@ impl QwopMod {
                 }
 
                 player.apply_speffect(FALLEN_SP_EFFECT_ID, true);
+            }
+
+            // Running backwards is a bit of a cheese but I think it's more fun to not disallow it.
+            // Let the player know we're on to them.
+            if !self.cheese_discovered && distance < -50.0 {
+                if let Ok(fe_man) = unsafe { CSFeManImp::instance_mut() } {
+                    fe_man.frontend_values.full_screen_message_request_id =
+                        eldenring::cs::FullScreenMessage::HunterRankAdvanced;
+                    self.cheese_discovered = true;
+                }
             }
 
             self.transition_time =
