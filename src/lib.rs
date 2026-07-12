@@ -1,4 +1,5 @@
 mod input_state;
+mod messages;
 mod physics;
 mod player_ins_skeleton_ext;
 mod qwop_mod;
@@ -23,9 +24,11 @@ use eldenring::{
 use fromsoftware_shared::{Program, SharedTaskImpExt};
 use pelite::pe64::{Pe, Rva};
 
+use crate::messages::{MessageCategory, QwopMessages, StaticUtf16String};
 use crate::qwop_mod::QwopMod;
 
 retour::static_detour! {
+    static MsgRepository_LookupEntry: extern "C" fn(NonNull<()>, i32, MessageCategory, i32) -> StaticUtf16String;
     static ChrCtrl_UpdatePos: extern "C" fn(NonNull<ChrCtrl>);
     static ChrIns_BehaviorSafe: extern "C" fn(NonNull<WorldChrMan>);
 }
@@ -58,6 +61,21 @@ pub extern "C" fn DllMain(module: HINSTANCE, reason: u32) -> bool {
         let rva_to_ptr = |rva: Rva| Program::current().rva_to_va(rva).unwrap() as *const ();
 
         unsafe {
+            MsgRepository_LookupEntry
+                .initialize(
+                    retour::Function::from_ptr(rva_to_ptr(rvas::MSG_REPOSITORY_LOOKUP_ENTRY)),
+                    |this, version, category, id| {
+                        if let Some(result) = QwopMessages::lookup_message(category, id) {
+                            return result;
+                        }
+
+                        MsgRepository_LookupEntry.call(this, version, category, id)
+                    },
+                )
+                .unwrap()
+                .enable()
+                .unwrap();
+
             ChrCtrl_UpdatePos
                 .initialize(
                     retour::Function::from_ptr(rva_to_ptr(rvas::CHR_CTRL_UPDATE_POS)),
