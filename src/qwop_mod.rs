@@ -136,9 +136,11 @@ impl QwopMod {
                 (self.transition_time - player.modules.hitstop.frame_time).max(0.0);
         }
 
-        // No normal walking or horse allowed while QWOP is enabled.
-        // TODO: disable evasion actions (roll, sneak, backstep) as well. Currently these are
-        // controlled in HKS, which isn't aware of the mod's enabled/disabled status
+        // No normal walking, sneaking, rolling, backstep, or horse allowed while QWOP is enabled.
+        let disabled_actions = &mut player.modules.action_request.disabled_action_inputs;
+        disabled_actions.set_l3(self.qwop_enabled);
+        disabled_actions.set_rolling(self.qwop_enabled);
+        disabled_actions.set_backstep(self.qwop_enabled);
         player.debug_flags.set_disabled_movement(self.qwop_enabled);
 
         if let Some(horse_whistle) = unsafe { SoloParamRepository::instance_mut() }
