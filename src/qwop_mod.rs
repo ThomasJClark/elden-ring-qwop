@@ -170,8 +170,13 @@ impl QwopMod {
 
         let frame_time = player.modules.hitstop.frame_time;
         let orientation = player.modules.physics.orientation;
+        let disable_turning = player
+            .modules
+            .action_flag
+            .action_modifiers_flags
+            .disable_turning();
 
-        if let Ok(cs_camera) = unsafe { CSCamera::instance() } {
+        if !disable_turning && let Ok(cs_camera) = unsafe { CSCamera::instance() } {
             let target_angle = {
                 let camera_matrix = cs_camera.pers_cam_2.matrix;
                 let camera_angle = f32::atan2(camera_matrix.0.2, camera_matrix.2.2);
