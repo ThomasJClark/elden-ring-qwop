@@ -18,21 +18,61 @@ use crate::player_ins_skeleton_ext::PlayerInsSkeletonExt;
 /// SpEffectParam that applies damage and blood splatter VFX after falling
 const FALLEN_SP_EFFECT_ID: i32 = 67;
 
-/// SpEffectParam active while the player is resting at a grace. QWOP is disabled in this state.
-const SITE_OF_LOST_GRACE_SP_EFFECT_ID: i32 = 9607;
-
 /// EquipParamGoods for the horse summon wistle. Horse is banned because it trivializes movement
 const SPECTRAL_STEED_WHISTLE_GOODS_ID: u32 = 130;
 
 const ROTATION_SPEED: f32 = 540.0_f32.to_radians();
 
-/// Time in seconds to visually transition between QWOP enabled and disabled states
-const TRANSITION_TIME: f32 = 0.35;
-
 const ROOT_MOTION_DAMPING: f32 = 4.0;
 
 // Conversion factor for QWOP meters to Elden Ring physics units determined by vibes
 const WORLD_SCALE: f32 = 1.1165984;
+
+static EXCLUDED_ANIMATIONS: phf::Set<i32> = phf::phf_set! {
+    60200,        // pull lever
+    68011, 68012, // grace
+    68021, 68022, // grace
+    60470,        // walking through magic portal
+    60060,        // fog wall
+    28030, 28040, 28011, 28012, 28021, 28022, // ladder
+    81000, 81001, // prayer
+    81010, 81011, // desparate prayer
+    80400,        // extreme repentance
+    80410,        // grovel for mercy
+    80910, 80911, // crossed legs
+    80940, 80941, // dozing crossed legs
+    80920, 80921, // rest
+    80930, 80931, // sitting sideways
+    80800, 80801, // dejection
+    80900, 80901, // patches crouch
+    80970, 80971, // balled up
+    80950, 80951, // spread out
+};
+
+static SLOW_TRANSITION_ANIMATIONS: phf::Set<i32> = phf::phf_set! {
+    81000, 81002, // prayer
+    81010, 81012, // desparate prayer
+    80910, 80912, // crossed legs
+    80940, 80942, // dozing crossed legs
+    80920, 80922, // rest
+    80930, 80932, // sitting sideways
+    80800, 80802, // dejection
+    80900, 80902, // patches crouch
+    80970, 80972, // balled up
+    80950, 80952, // spread out
+};
+
+#[derive(Default, Debug, Clone, PartialEq)]
+enum ModStatus {
+    /// Normal controls
+    Normal,
+    /// QWOP controls
+    #[default]
+    Qwop,
+    /// Normal pose but don't allow moving. This is temporarily switched on during animations
+    /// where the player is sitting down or performing another special action that prevents walking.
+    Frozen,
+}
 
 #[derive(Default)]
 pub struct QwopMod {
@@ -40,8 +80,8 @@ pub struct QwopMod {
     physics: QwopPhysics,
     prev_main_player_loaded: bool,
     displacement: Vec3,
-    qwop_enabled: bool,
-    transition_time: f32,
+    status: ModStatus,
+    transition_progress: f32,
     cheese_discovered: bool,
 }
 
@@ -67,23 +107,32 @@ impl QwopMod {
             self.physics.reset();
             self.prev_main_player_loaded = true;
             self.displacement = Vec3::ZERO;
-            self.transition_time = 0.0;
+            self.transition_progress = 0.0;
         }
 
         self.input_state.poll();
 
-        self.qwop_enabled =
-            // Disable QWOP if toggled off by the player
-            !self.input_state.disabled
-            // Disable QWOP while performing a crit or being critted
-            && player.modules.throw.throw_node.throw_state == ThrowNodeState::None
-            // Disable QWOP while resting at a bonfire
-            && !player
-                .special_effect
-                .entries()
-                .any(|entry| entry.param_id == SITE_OF_LOST_GRACE_SP_EFFECT_ID);
+        let slow_transition = player
+            .modules
+            .time_act
+            .anim_queue
+            .iter()
+            .any(|anim| SLOW_TRANSITION_ANIMATIONS.contains(&anim.anim_id));
 
-        if self.qwop_enabled {
+        if self.input_state.disabled {
+            self.status = ModStatus::Normal;
+        } else if
+        // Disable QWOP while performing a crit or being critted
+        player.modules.throw.throw_node.throw_state != ThrowNodeState::None
+        // Disable QWOP during certain animations
+        || player.modules.time_act.anim_queue.iter().any(|anim| EXCLUDED_ANIMATIONS.contains(&anim.anim_id))
+        {
+            self.status = ModStatus::Frozen;
+        } else {
+            self.status = ModStatus::Qwop;
+        }
+
+        if self.status == ModStatus::Qwop {
             self.physics.control(
                 self.input_state.q,
                 self.input_state.w,
@@ -128,20 +177,25 @@ impl QwopMod {
                     self.cheese_discovered = true;
                 }
             }
-
-            self.transition_time =
-                (self.transition_time + player.modules.hitstop.frame_time).min(TRANSITION_TIME);
-        } else {
-            self.transition_time =
-                (self.transition_time - player.modules.hitstop.frame_time).max(0.0);
         }
+
+        let mut transition_speed = if slow_transition { 0.5 } else { 3.0 };
+        if self.status != ModStatus::Qwop {
+            transition_speed *= -1.0;
+        }
+        self.transition_progress += transition_speed * player.modules.hitstop.frame_time;
+        self.transition_progress = self.transition_progress.max(0.0).min(1.0);
+
+        let disable_normal_movement = self.status != ModStatus::Normal;
 
         // No normal walking, sneaking, rolling, backstep, or horse allowed while QWOP is enabled.
         let disabled_actions = &mut player.modules.action_request.disabled_action_inputs;
-        disabled_actions.set_l3(self.qwop_enabled);
-        disabled_actions.set_rolling(self.qwop_enabled);
-        disabled_actions.set_backstep(self.qwop_enabled);
-        player.debug_flags.set_disabled_movement(self.qwop_enabled);
+        disabled_actions.set_l3(disable_normal_movement);
+        disabled_actions.set_rolling(disable_normal_movement);
+        disabled_actions.set_backstep(disable_normal_movement);
+        player
+            .debug_flags
+            .set_disabled_movement(disable_normal_movement);
 
         if let Some(horse_whistle) = unsafe { SoloParamRepository::instance_mut() }
             .ok()
@@ -149,7 +203,7 @@ impl QwopMod {
                 solo_param_repository.get_mut::<EquipParamGoods>(SPECTRAL_STEED_WHISTLE_GOODS_ID)
             })
         {
-            horse_whistle.set_enable_live(!self.qwop_enabled)
+            horse_whistle.set_enable_live(!disable_normal_movement)
         }
     }
 
@@ -157,7 +211,7 @@ impl QwopMod {
     /// in a hook in the middle of the HavokBehavior task group, after the player's root motion has
     /// been set but before it is applied.
     pub fn chr_ctrl_update_pos_hook(&mut self, chr_ctrl: NonNull<ChrCtrl>) {
-        if !self.qwop_enabled {
+        if self.status != ModStatus::Qwop {
             return;
         }
 
@@ -233,7 +287,7 @@ impl QwopMod {
         player.set_ragdoll(false);
 
         // When the player falls per QWOP rules or dies in real life, ragdoll because it's funny
-        if self.qwop_enabled
+        if self.status != ModStatus::Normal
             && (self.physics.fallen()
                 || unsafe { player.player_game_data.as_ref() }.current_hp == 0)
         {
@@ -241,8 +295,7 @@ impl QwopMod {
             return;
         }
 
-        let lerp_amount =
-            1.0 - f32::cos(self.transition_time / TRANSITION_TIME * f32::consts::PI / 2.0);
+        let lerp_amount = 1.0 - f32::cos(self.transition_progress * f32::consts::PI / 2.0);
 
         player.set_pose(
             self.physics.elevation() * WORLD_SCALE,
