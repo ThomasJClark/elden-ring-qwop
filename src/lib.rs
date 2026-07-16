@@ -55,13 +55,15 @@ pub extern "C" fn DllMain(module: HINSTANCE, reason: u32) -> bool {
 
     unsafe { DisableThreadLibraryCalls(module.into()) }.unwrap();
 
-    unsafe {
-        AllocConsole().unwrap();
-        let stdout = OpenOptions::new().write(true).open("CONOUT$").unwrap();
-        SetStdHandle(STD_OUTPUT_HANDLE, HANDLE(stdout.as_raw_handle() as _)).unwrap();
-        SetStdHandle(STD_ERROR_HANDLE, HANDLE(stdout.as_raw_handle() as _)).unwrap();
-        std::mem::forget(stdout);
-    };
+    if cfg!(debug_assertions) {
+        unsafe {
+            AllocConsole().unwrap();
+            let stdout = OpenOptions::new().write(true).open("CONOUT$").unwrap();
+            SetStdHandle(STD_OUTPUT_HANDLE, HANDLE(stdout.as_raw_handle() as _)).unwrap();
+            SetStdHandle(STD_ERROR_HANDLE, HANDLE(stdout.as_raw_handle() as _)).unwrap();
+            std::mem::forget(stdout);
+        };
+    }
 
     let qwop_mod = Box::leak(Box::new(Mutex::new(QwopMod::default())));
 
