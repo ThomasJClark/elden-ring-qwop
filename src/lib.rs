@@ -1,12 +1,17 @@
 mod input_state;
 mod messages;
+mod param;
 mod physics;
 mod player_ins_skeleton_ext;
 mod qwop_mod;
 mod rvas;
 
 use std::{
-    fs::OpenOptions, os::windows::io::AsRawHandle, ptr::NonNull, sync::Mutex, time::Duration,
+    fs::OpenOptions,
+    os::windows::io::AsRawHandle,
+    ptr::NonNull,
+    sync::{Mutex, OnceLock},
+    time::Duration,
 };
 use windows::Win32::{
     Foundation::{HANDLE, HINSTANCE},
@@ -20,15 +25,24 @@ use windows::Win32::{
 use eldenring::{
     cs::{CSTaskGroupIndex, CSTaskImp, ChrCtrl, WorldChrMan},
     fd4::FD4TaskData,
+    param::SP_EFFECT_PARAM_ST,
 };
 use fromsoftware_shared::{Program, SharedTaskImpExt};
+
 use pelite::pe64::{Pe, Rva};
 
-use crate::messages::{MessageCategory, QwopMessages, StaticUtf16String};
+use crate::param::{BASE_SP_EFFECT_ID, FALLEN_SP_EFFECT_ID, SpEffectParamLookupResult};
 use crate::qwop_mod::QwopMod;
+use crate::{
+    messages::{MessageCategory, QwopMessages, StaticUtf16String},
+    param::get_fallen_sp_effect_param,
+};
+
+static FALLEN_SP_EFFECT_PARAM: OnceLock<SP_EFFECT_PARAM_ST> = OnceLock::new();
 
 retour::static_detour! {
     static MsgRepository_LookupEntry: extern "C" fn(NonNull<()>, i32, MessageCategory, i32) -> StaticUtf16String;
+    static GetSpEffectParam: extern "C" fn(NonNull<SpEffectParamLookupResult>, i32) -> NonNull<SpEffectParamLookupResult>;
     static ChrCtrl_UpdatePos: extern "C" fn(NonNull<ChrCtrl>);
     static ChrIns_BehaviorSafe: extern "C" fn(NonNull<WorldChrMan>);
 }
@@ -70,6 +84,36 @@ pub extern "C" fn DllMain(module: HINSTANCE, reason: u32) -> bool {
                         }
 
                         MsgRepository_LookupEntry.call(this, version, category, id)
+                    },
+                )
+                .unwrap()
+                .enable()
+                .unwrap();
+
+            GetSpEffectParam
+                .initialize(
+                    retour::Function::from_ptr(rva_to_ptr(rvas::GET_SP_EFFECT_PARAM)),
+                    |mut result, id| {
+                        if id == FALLEN_SP_EFFECT_ID {
+                            let param =
+                                FALLEN_SP_EFFECT_PARAM.get_or_init(|| -> SP_EFFECT_PARAM_ST {
+                                    GetSpEffectParam.call(result, BASE_SP_EFFECT_ID);
+                                    println!("{:?}", result.as_ref().param);
+                                    get_fallen_sp_effect_param(
+                                        result.as_ref().param.unwrap().read(),
+                                    )
+                                });
+
+                            *result.as_mut() = SpEffectParamLookupResult {
+                                param: Some(NonNull::from_ref(param)),
+                                _id: id,
+                                _unkc: 4,
+                            };
+                        } else {
+                            GetSpEffectParam.call(result, id);
+                        }
+
+                        result
                     },
                 )
                 .unwrap()

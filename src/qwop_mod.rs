@@ -12,11 +12,9 @@ use fromsoftware_shared::FromStatic;
 use glam::{Vec3, Vec4, Vec4Swizzles};
 
 use crate::input_state::QwopInputState;
+use crate::param::FALLEN_SP_EFFECT_ID;
 use crate::physics::QwopPhysics;
 use crate::player_ins_skeleton_ext::PlayerInsSkeletonExt;
-
-/// SpEffectParam that applies damage and blood splatter VFX after falling
-const FALLEN_SP_EFFECT_ID: i32 = 67;
 
 /// EquipParamGoods for the horse summon wistle. Horse is banned because it trivializes movement
 const SPECTRAL_STEED_WHISTLE_GOODS_ID: u32 = 130;
