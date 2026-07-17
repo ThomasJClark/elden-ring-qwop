@@ -17,7 +17,7 @@ pub const BASE_SP_EFFECT_ID: i32 = 10600;
 /// 10600
 pub fn get_fallen_sp_effect_param(param: SP_EFFECT_PARAM_ST) -> SP_EFFECT_PARAM_ST {
     let mut param = param;
-    // Subtrack 1/10 of HP rounded up each time you fall
+    // Subtract 1/10 of HP rounded up each time you fall
     param.set_change_hp_point(1);
     param.set_change_hp_rate(10.0);
     // Funny blood spatter animation
