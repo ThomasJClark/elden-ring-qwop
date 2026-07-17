@@ -7,25 +7,31 @@ mod qwop_mod;
 mod rvas;
 
 use std::{
-    fs::OpenOptions,
+    fs::{File, OpenOptions},
+    io::Write,
     os::windows::io::AsRawHandle,
+    panic,
     ptr::NonNull,
     sync::{Mutex, OnceLock},
     time::Duration,
 };
-use windows::Win32::{
-    Foundation::{HANDLE, HINSTANCE},
-    System::{
-        Console::{AllocConsole, STD_ERROR_HANDLE, STD_OUTPUT_HANDLE, SetStdHandle},
-        LibraryLoader::DisableThreadLibraryCalls,
-        SystemServices::DLL_PROCESS_ATTACH,
+use windows::{
+    Win32::{
+        Foundation::{HANDLE, HINSTANCE},
+        System::{
+            Console::{AllocConsole, STD_ERROR_HANDLE, STD_OUTPUT_HANDLE, SetStdHandle},
+            LibraryLoader::DisableThreadLibraryCalls,
+            SystemServices::DLL_PROCESS_ATTACH,
+        },
     },
+    core::BOOL,
 };
 
 use eldenring::{
     cs::{CSTaskGroupIndex, CSTaskImp, ChrCtrl, WorldChrMan},
     fd4::FD4TaskData,
     param::SP_EFFECT_PARAM_ST,
+    util::system::wait_for_system_init,
 };
 use fromsoftware_shared::{Program, SharedTaskImpExt};
 
@@ -48,12 +54,20 @@ retour::static_detour! {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn DllMain(module: HINSTANCE, reason: u32) -> bool {
+pub extern "C" fn DllMain(module: HINSTANCE, reason: u32) -> BOOL {
     if reason != DLL_PROCESS_ATTACH {
-        return true;
+        return true.into();
     }
 
-    unsafe { DisableThreadLibraryCalls(module.into()) }.unwrap();
+    panic::set_hook(Box::new(|panic_info| {
+        if let Ok(mut file) = File::create("erop-crash.log") {
+            let _ = writeln!(file, "=== EROP CRASHLOG ===");
+            let _ = writeln!(file, "{}", panic_info);
+        }
+    }));
+
+    // Ignore failures, this is just for optimization and doesn't seem to work under Proton
+    let _ = unsafe { DisableThreadLibraryCalls(module.into()) };
 
     if cfg!(debug_assertions) {
         unsafe {
@@ -68,6 +82,7 @@ pub extern "C" fn DllMain(module: HINSTANCE, reason: u32) -> bool {
     let qwop_mod = Box::leak(Box::new(Mutex::new(QwopMod::default())));
 
     std::thread::spawn(move || {
+        wait_for_system_init(&Program::current(), Duration::MAX).unwrap();
         let cs_task = CSTaskImp::wait_for_instance(Duration::MAX).unwrap();
         cs_task.run_recurring(
             |_: &FD4TaskData| qwop_mod.lock().unwrap().chr_ins_pre_behavior(),
@@ -100,7 +115,6 @@ pub extern "C" fn DllMain(module: HINSTANCE, reason: u32) -> bool {
                             let param =
                                 FALLEN_SP_EFFECT_PARAM.get_or_init(|| -> SP_EFFECT_PARAM_ST {
                                     GetSpEffectParam.call(result, BASE_SP_EFFECT_ID);
-                                    println!("{:?}", result.as_ref().param);
                                     get_fallen_sp_effect_param(
                                         result.as_ref().param.unwrap().read(),
                                     )
@@ -152,5 +166,5 @@ pub extern "C" fn DllMain(module: HINSTANCE, reason: u32) -> bool {
         }
     });
 
-    true
+    true.into()
 }
