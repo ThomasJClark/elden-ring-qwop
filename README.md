@@ -26,6 +26,10 @@ All other forms of movement are disabled while QWOP controls are on. Attacking, 
 
 Tip: You can change the keybindings to whatever you want in the game's keyboard settings. I recommend finding something that you can comfortably press with one hand, so your right hand can stay on the mouse.
 
+### I don't know what QWOP means. What is this?
+
+Watch this video: https://www.youtube.com/watch?v=EmcMG4uxiHk
+
 ### Can you actually beat the game like this?
 
 Probably. I think so. I don't expect anyone to, but it should be possible with a lot of patience.
