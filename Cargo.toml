@@ -8,17 +8,17 @@ license = "MIT"
 crate-type = ["cdylib"]
 
 [profile.release]
-panic = "abort"
-strip = true
+# panic = "abort"
+# strip = true
 lto = true
 codegen-units = 1
 
 [dependencies]
-eldenring = { git = "https://github.com/ThomasJClark/fromsoftware-rs.git", rev = "9abf1e24e5" }
-fromsoftware-shared = { git = "https://github.com/ThomasJClark/fromsoftware-rs.git", rev = "9abf1e24e5" }
-glam = "0.32.1"
+eldenring = { git = "https://github.com/ThomasJClark/fromsoftware-rs.git", rev = "588b2b6def" }
+fromsoftware-shared = { git = "https://github.com/ThomasJClark/fromsoftware-rs.git", rev = "588b2b6def" }
+glam = "0.33.11"
 pelite = "0.10.0"
-phf = { version = "0.13.1", features = ["macros"] }
+phf = { version = "0.14.0", features = ["macros"] }
 retour = { version = "0.3.1", features = ["static-detour"] }
 windows = { version = "0.62.2", features = [
     "Win32_System_Console",

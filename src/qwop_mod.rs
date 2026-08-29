@@ -27,37 +27,37 @@ const ROOT_MOTION_DAMPING: f32 = 4.0;
 const WORLD_SCALE: f32 = 1.1165984;
 
 static EXCLUDED_ANIMATIONS: phf::Set<i32> = phf::phf_set! {
-    60200,        // pull lever
-    68011, 68012, // grace
-    68021, 68022, // grace
-    60470,        // walking through magic portal
-    60060,        // fog wall
-    28030, 28040, 28011, 28012, 28021, 28022, // ladder
-    81000, 81001, // prayer
-    81010, 81011, // desparate prayer
-    80400,        // extreme repentance
-    80410,        // grovel for mercy
-    80910, 80911, // crossed legs
-    80940, 80941, // dozing crossed legs
-    80920, 80921, // rest
-    80930, 80931, // sitting sideways
-    80800, 80801, // dejection
-    80900, 80901, // patches crouch
-    80970, 80971, // balled up
-    80950, 80951, // spread out
+    60200i32,           // pull lever
+    68011i32, 68012i32, // grace
+    68021i32, 68022i32, // grace
+    60470i32,           // walking through magic portal
+    60060i32,           // fog wall
+    28030i32, 28040i32, 28011i32, 28012i32, 28021i32, 28022i32, // ladder
+    81000i32, 81001i32, // prayer
+    81010i32, 81011i32, // desparate prayer
+    80400i32,           // extreme repentance
+    80410i32,           // grovel for mercy
+    80910i32, 80911i32, // crossed legs
+    80940i32, 80941i32, // dozing crossed legs
+    80920i32, 80921i32, // rest
+    80930i32, 80931i32, // sitting sideways
+    80800i32, 80801i32, // dejection
+    80900i32, 80901i32, // patches crouch
+    80970i32, 80971i32, // balled up
+    80950i32, 80951i32, // spread out
 };
 
 static SLOW_TRANSITION_ANIMATIONS: phf::Set<i32> = phf::phf_set! {
-    81000, 81002, // prayer
-    81010, 81012, // desparate prayer
-    80910, 80912, // crossed legs
-    80940, 80942, // dozing crossed legs
-    80920, 80922, // rest
-    80930, 80932, // sitting sideways
-    80800, 80802, // dejection
-    80900, 80902, // patches crouch
-    80970, 80972, // balled up
-    80950, 80952, // spread out
+    81000i32, 81002i32, // prayer
+    81010i32, 81012i32, // desparate prayer
+    80910i32, 80912i32, // crossed legs
+    80940i32, 80942i32, // dozing crossed legs
+    80920i32, 80922i32, // rest
+    80930i32, 80932i32, // sitting sideways
+    80800i32, 80802i32, // dejection
+    80900i32, 80902i32, // patches crouch
+    80970i32, 80972i32, // balled up
+    80950i32, 80952i32, // spread out
 };
 
 #[derive(Default, Debug, Clone, PartialEq)]
@@ -168,10 +168,9 @@ impl QwopMod {
 
             // Running backwards is a bit of a cheese but I think it's more fun to not disallow it.
             // Let the player know we're on to them.
-            if !self.cheese_discovered && distance < -50.0 {
+            if !self.cheese_discovered && distance < -1.0 {
                 if let Ok(fe_man) = unsafe { CSFeManImp::instance_mut() } {
-                    fe_man.frontend_values.full_screen_message_request_id =
-                        eldenring::cs::FullScreenMessage::HunterRankAdvanced;
+                    fe_man.frontend_values.full_screen_message_request_id = 140;
                     self.cheese_discovered = true;
                 }
             }
