@@ -10,7 +10,7 @@ pub const CHR_CTRL_UPDATE_POS: Rva = 0x3c8620;
 pub const REFRESH_USER_INPUT_MAPPING: Rva = 0x243200;
 
 // const wchar_t *MsgRepository::LookupEntry(uint32_t version, MessageCategory category, uint32_t id)
-pub const MSG_REPOSITORY_LOOKUP_ENTRY: Rva = 0x266fbd0;
+pub const MSG_REPOSITORY_LOOKUP_ENTRY: Rva = 0x266fc40;
 
 // SpEffectParamLookupResult GetSpEffectParam(uint paramId)
-pub const GET_SP_EFFECT_PARAM: Rva = 0xd52330;
+pub const GET_SP_EFFECT_PARAM: Rva = 0xd523a0;

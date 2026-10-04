@@ -59,13 +59,6 @@ pub extern "C" fn DllMain(module: HINSTANCE, reason: u32) -> BOOL {
         return true.into();
     }
 
-    panic::set_hook(Box::new(|panic_info| {
-        if let Ok(mut file) = File::create("erop-crash.log") {
-            let _ = writeln!(file, "=== EROP CRASHLOG ===");
-            let _ = writeln!(file, "{}", panic_info);
-        }
-    }));
-
     // Ignore failures, this is just for optimization and doesn't seem to work under Proton
     let _ = unsafe { DisableThreadLibraryCalls(module.into()) };
 
@@ -77,6 +70,13 @@ pub extern "C" fn DllMain(module: HINSTANCE, reason: u32) -> BOOL {
             SetStdHandle(STD_ERROR_HANDLE, HANDLE(stdout.as_raw_handle() as _)).unwrap();
             std::mem::forget(stdout);
         };
+    } else {
+        panic::set_hook(Box::new(|panic_info| {
+            if let Ok(mut file) = File::create("erop-crash.log") {
+                let _ = writeln!(file, "=== EROP CRASHLOG ===");
+                let _ = writeln!(file, "{panic_info}");
+            }
+        }));
     }
 
     let qwop_mod = Box::leak(Box::new(Mutex::new(QwopMod::default())));

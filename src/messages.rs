@@ -15,8 +15,8 @@ pub struct StaticUtf16String(*const u16);
 unsafe impl Sync for StaticUtf16String {}
 unsafe impl Send for StaticUtf16String {}
 
-impl From<&str> for StaticUtf16String {
-    fn from(s: &str) -> Self {
+impl From<&'static str> for StaticUtf16String {
+    fn from(s: &'static str) -> Self {
         Self(s.encode_utf16().collect::<Vec<_>>().leak().as_ptr())
     }
 }

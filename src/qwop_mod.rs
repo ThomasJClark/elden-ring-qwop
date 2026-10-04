@@ -168,9 +168,9 @@ impl QwopMod {
 
             // Running backwards is a bit of a cheese but I think it's more fun to not disallow it.
             // Let the player know we're on to them.
-            if !self.cheese_discovered && distance < -1.0 {
+            if !self.cheese_discovered && distance < -50.0 {
                 if let Ok(fe_man) = unsafe { CSFeManImp::instance_mut() } {
-                    fe_man.frontend_values.full_screen_message_request_id = 140;
+                    fe_man.frontend_values.full_screen_message_request_id = 38;
                     self.cheese_discovered = true;
                 }
             }
