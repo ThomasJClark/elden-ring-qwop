@@ -1,8 +1,11 @@
 mod keybindings;
 
 use eldenring::{cs::UserInputKey, fd4::FD4PadManager};
-use fromsoftware_shared::FromStatic;
+use fromsoftware_shared::{FromStatic, Program};
 use keybindings::Keybindings;
+use pelite::pe::Pe;
+
+use crate::rvas;
 
 /// Manages input state for QWOP, and updates the keybindings when QWOP is enabled. Note that
 /// the FD4Pad system is used for input instead of raw Windows APIs so that the keybindings can
@@ -20,6 +23,9 @@ pub struct QwopInputState {
     /// Prevents input polling until after we set up keybindings. We need to wait 1 frame after
     /// so the FD4Pad state is updated after the keybindings are changed
     initialized_keybindings: bool,
+
+    /// True to trigger refreshing the keybindings in the MenuMan task
+    must_refresh_keybindings: bool,
 
     /// Keybindings to use when QWOP is enabled. A mutable copy of this array is kept so that
     /// QWOP controls can be temporarily disabled and enabled without resetting custom keybinding
@@ -52,12 +58,30 @@ impl QwopInputState {
         if keybindings.is_wasd() != self.disabled {
             if self.disabled {
                 self.keybindings = keybindings;
-                Keybindings::vanilla().apply();
+                keybindings::VANILLA.apply();
             } else {
                 self.keybindings.apply();
             }
+            self.must_refresh_keybindings = true;
         }
 
         self.initialized_keybindings = true;
+    }
+
+    /// SAFETY: must be called in the MenuMan task (I think)
+    pub unsafe fn refresh(&mut self) {
+        if self.must_refresh_keybindings {
+            let refresh_user_input_mapping = unsafe {
+                std::mem::transmute::<u64, unsafe extern "C" fn() -> ()>(
+                    Program::current()
+                        .rva_to_va(rvas::REFRESH_USER_INPUT_MAPPING)
+                        .unwrap(),
+                )
+            };
+
+            unsafe { refresh_user_input_mapping() };
+
+            self.must_refresh_keybindings = false;
+        }
     }
 }

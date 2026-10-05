@@ -204,6 +204,11 @@ impl QwopMod {
         }
     }
 
+    /// Gotta call the refresh keybindings thing here
+    pub fn menu_man(&mut self) {
+        unsafe { self.input_state.refresh() };
+    }
+
     /// Update the player's root motion based on the current QWOP physics state. This must be done
     /// in a hook in the middle of the HavokBehavior task group, after the player's root motion has
     /// been set but before it is applied.

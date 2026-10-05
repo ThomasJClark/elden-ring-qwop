@@ -1,8 +1,5 @@
 use eldenring::cs::{CSKeyboardKey, CSPcKeyConfig, KeyAssignID};
-use fromsoftware_shared::{FromStatic, Program};
-use pelite::pe::Pe;
-
-use crate::rvas;
+use fromsoftware_shared::FromStatic;
 
 /// Configuration for keyboard controls relevant to QWOP. The keybindings are updated when
 /// the mod is loaded, and toggled between vanilla and QWOP when QWOP mode is turned on and off
@@ -31,6 +28,17 @@ impl Default for Keybindings {
     }
 }
 
+/// The default keybindings for the vanilla game
+pub static VANILLA: Keybindings = Keybindings {
+    move_forwards: CSKeyboardKey::W,
+    move_backwards: CSKeyboardKey::S,
+    move_left: CSKeyboardKey::A,
+    move_right: CSKeyboardKey::D,
+    crouch_stand_up: CSKeyboardKey::C,
+    backstep_dodge_roll_dash: CSKeyboardKey::LeftShift,
+    reset_camera_lock_on_remove_target: CSKeyboardKey::Q,
+};
+
 impl Keybindings {
     /// Returns the current keybinding settings per [CSPcKeyConfig]
     pub fn current() -> Self {
@@ -54,29 +62,17 @@ impl Keybindings {
         }
     }
 
-    /// Returns the default keybindings for the vanilla game
-    pub fn vanilla() -> Self {
-        Self {
-            move_forwards: CSKeyboardKey::W,
-            move_backwards: CSKeyboardKey::S,
-            move_left: CSKeyboardKey::A,
-            move_right: CSKeyboardKey::D,
-            crouch_stand_up: CSKeyboardKey::C,
-            backstep_dodge_roll_dash: CSKeyboardKey::LeftShift,
-            reset_camera_lock_on_remove_target: CSKeyboardKey::Q,
-        }
-    }
-
     /// Returns true if the keybindings are currently set to the default WASD controls. This is
     /// used as a heuristic to determine if QWOP controls were applied
     pub fn is_wasd(&self) -> bool {
-        self.move_forwards == CSKeyboardKey::W
-            && self.move_left == CSKeyboardKey::A
-            && self.move_backwards == CSKeyboardKey::S
-            && self.move_right == CSKeyboardKey::D
+        self.move_forwards == VANILLA.move_forwards
+            && self.move_left == VANILLA.move_left
+            && self.move_backwards == VANILLA.move_backwards
+            && self.move_right == VANILLA.move_right
     }
 
-    /// Applies the keybinding settings to the game. They can then be polled on the next frame.
+    /// Applies the keybinding settings to the game. Note that RefreshUserInputMapping()
+    /// must be called and one frame pass before the new keybindings can actually be polled
     pub fn apply(&self) {
         let Ok(key_config) = (unsafe { CSPcKeyConfig::instance_mut() }) else {
             return;
@@ -101,14 +97,5 @@ impl Keybindings {
             KeyAssignID::ResetCameraLockOnRemoveTarget,
             self.reset_camera_lock_on_remove_target,
         );
-
-        let refresh_user_input_mapping = unsafe {
-            std::mem::transmute::<u64, extern "C" fn() -> ()>(
-                Program::current()
-                    .rva_to_va(rvas::REFRESH_USER_INPUT_MAPPING)
-                    .unwrap(),
-            )
-        };
-        refresh_user_input_mapping();
     }
 }

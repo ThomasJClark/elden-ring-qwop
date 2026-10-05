@@ -88,6 +88,10 @@ pub extern "C" fn DllMain(module: HINSTANCE, reason: u32) -> BOOL {
             |_: &FD4TaskData| qwop_mod.lock().unwrap().chr_ins_pre_behavior(),
             CSTaskGroupIndex::ChrIns_PreBehavior,
         );
+        cs_task.run_recurring(
+            |_: &FD4TaskData| qwop_mod.lock().unwrap().menu_man(),
+            CSTaskGroupIndex::MenuMan,
+        );
 
         let rva_to_ptr = |rva: Rva| Program::current().rva_to_va(rva).unwrap() as *const ();
 
